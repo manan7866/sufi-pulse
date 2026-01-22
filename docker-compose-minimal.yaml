@@ -1,0 +1,65 @@
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: sufi_pulse_db_minimal
+    environment:
+      POSTGRES_DB: sufi_pulse_db
+      POSTGRES_USER: sufi_pulse_user
+      POSTGRES_PASSWORD: sufi_pulse_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sufipulse-backend-talhaadil/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+    networks:
+      - sufi_pulse_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sufi_pulse_user -d sufi_pulse_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service (FastAPI)
+  backend:
+    build:
+      context: ./sufipulse-backend-talhaadil
+      dockerfile: Dockerfile
+    container_name: sufi_pulse_backend_minimal
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://sufi_pulse_user:sufi_pulse_password@db:5432/sufi_pulse_db
+      DB_HOST: db
+      DB_NAME: sufi_pulse_db
+      DB_USER: sufi_pulse_user
+      DB_PASSWORD: sufi_pulse_password
+      DB_PORT: 5432
+      SECRET_KEY: your-secret-key-here
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sufi_pulse_network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  postgres_data:
+
+networks:
+  sufi_pulse_network:
+    driver: bridge

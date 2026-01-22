@@ -1,0 +1,8 @@
+# This is a placeholder requirements.txt for any Python dependencies
+# that might be used in the build process or scripts
+# For a Next.js application, Python is typically not required
+# but included here in case build scripts need Python tools
+
+# Example Python dependencies (uncomment if needed):
+# requests==2.31.0
+# python-dotenv==1.0.0

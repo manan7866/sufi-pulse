@@ -1,0 +1,111 @@
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: sufi_pulse_db_dev
+    environment:
+      POSTGRES_DB: sufi_pulse_db
+      POSTGRES_USER: sufi_pulse_user
+      POSTGRES_PASSWORD: sufi_pulse_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./sufipulse-backend-talhaadil/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      
+    networks:
+      - sufi_pulse_network_dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sufi_pulse_user -d sufi_pulse_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service (FastAPI) - Development with live reload using existing Dockerfile
+  backend:
+    build:
+      context: ./sufipulse-backend-talhaadil
+      dockerfile: Dockerfile  # Use existing Dockerfile from project
+    container_name: sufi_pulse_backend_dev
+    ports:
+      - "8000:8000"
+    volumes:
+      # Bind mount for real-time changes - mount source code to container
+      - ./sufipulse-backend-talhaadil:/app
+      # Named volume for Python cache to prevent conflicts (this overrides the cache dir in the bind mount)
+      - /app/__pycache__
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      DB_HOST: ${DB_HOST:-}
+      DB_NAME: ${DB_NAME:-}
+      DB_USER: ${DB_USER:-}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_PORT: ${DB_PORT:-5432}
+      SECRET_KEY: your-secret-key-here
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      FRONTEND_URL: http://localhost:3000
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sufi_pulse_network_dev
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    # Note: --reload enables auto-reload on file changes for development
+
+  # Frontend Service (Next.js) - Development with hot reload using existing Dockerfile
+  frontend:
+    build:
+      context: ./sufipulse-frontend-talhaadil
+      dockerfile: Dockerfile  # Use existing Dockerfile from project
+    container_name: sufi_pulse_frontend_dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Bind mount for real-time changes - mount source code to container
+      - ./sufipulse-frontend-talhaadil:/app
+      # Named volumes to prevent conflicts with local node_modules and build artifacts
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_build:/app/.next
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+      NEXT_PUBLIC_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+      NEXT_PUBLIC_YOUTUBE_API_KEY: ${NEXT_PUBLIC_YOUTUBE_API_KEY:-}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    depends_on:
+      - backend
+    networks:
+      - sufi_pulse_network_dev
+    restart: unless-stopped
+    # Run as root to avoid permission issues with bind mount
+    user: "0:0"
+    command: >
+      sh -c "sleep 5 && npm install && npm run dev"
+    # Note: npm run dev enables hot reloading for development
+
+volumes:
+  postgres_data_dev:
+    driver: local
+  frontend_node_modules:
+    driver: local
+  frontend_next_build:
+    driver: local
+
+networks:
+  sufi_pulse_network_dev:
+    driver: bridge
