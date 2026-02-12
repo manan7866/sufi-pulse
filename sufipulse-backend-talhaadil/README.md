@@ -42,8 +42,8 @@ Required environment variables:
 - `DATABASE_URL`: PostgreSQL database connection string
 - `JWT_SECRET`: Secret key for JWT token signing
 - `GOOGLE_CLIENT_ID`: Google OAuth client ID
-- `EMAIL_USER`: Email address for sending emails
-- `EMAIL_PASSWORD`: App password for email account
+- `RESEND_API_KEY`: API key for Resend email service
+- `FROM_EMAIL`: Email address to send emails from (e.g., connect@sufipulse.com)
 - `YOUTUBE_API_KEY`: YouTube Data API key
 
 ## Security Features

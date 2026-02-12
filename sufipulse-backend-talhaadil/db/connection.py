@@ -1,7 +1,12 @@
 import os
+from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import DictCursor
 
+# Load environment variables from .env file
+load_dotenv()
+
+print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 class DBConnection:
     """
     Manages a single global DB connection using psycopg (PostgreSQL).
@@ -13,6 +18,7 @@ class DBConnection:
         if cls._connection is None or cls._connection.closed:
             try:
                 database_url = os.getenv("DATABASE_URL")
+                print("Attempting to connect with DATABASE_URL:", database_url)
                 cls._connection = psycopg2.connect(
                     database_url,
                     cursor_factory=DictCursor
