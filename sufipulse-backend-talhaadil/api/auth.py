@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
+import psycopg2
 from utils.hashing import hash_password,verify_password
 from utils.jwt_handler import create_access_token, create_refresh_token,verify_token
 from utils.otp import generate_otp, send_otp_email, get_otp_expiry
@@ -59,163 +60,223 @@ def signup(data: SignUpRequest):
     if data.role == "admin":
         raise HTTPException(status_code=403, detail="Cannot sign up as admin")
 
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
 
-    if db.get_user_by_email(data.email):
-        raise HTTPException(status_code=400, detail="User already exists")
+            if db.get_user_by_email(data.email):
+                raise HTTPException(status_code=400, detail="User already exists")
 
-    hashed = hash_password(data.password)
-    otp = generate_otp()
-    otp_expiry = get_otp_expiry()
+            hashed = hash_password(data.password)
+            otp = generate_otp()
+            otp_expiry = get_otp_expiry()
 
-    db.create_user_with_otp(
-        email=data.email,
-        name=data.name,
-        password_hash=hashed,
-        role=data.role,
-        country=data.country,
-        city=data.city,
-        otp=otp,
-        otp_expiry=otp_expiry
-    )
+            db.create_user_with_otp(
+                email=data.email,
+                name=data.name,
+                password_hash=hashed,
+                role=data.role,
+                country=data.country,
+                city=data.city,
+                otp=otp,
+                otp_expiry=otp_expiry
+            )
 
-    send_otp_email(data.email, otp)
-    return {"message": "User created. OTP sent to your email."}
+            send_otp_email(data.email, otp)
+            return {"message": "User created. OTP sent to your email."}
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in signup: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in signup: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/verify-otp")
 def verify_otp(data: OTPVerifyRequest):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
 
-    user, msg = db.verify_otp_and_register(data.email, data.otp)
-    if not user:
-        raise HTTPException(status_code=400, detail=msg)
+            user, msg = db.verify_otp_and_register(data.email, data.otp)
+            if not user:
+                raise HTTPException(status_code=400, detail=msg)
 
-    # Decide check based on role
-    role = user.get("role")
-    if role == "vocalist":
-        info_submitted = bool(db.is_vocalist_registered(user["id"]))
-    else:
-        info_submitted = bool(db.is_writer_registered(user["id"]))
+            # Decide check based on role
+            role = user.get("role")
+            if role == "vocalist":
+                info_submitted = bool(db.is_vocalist_registered(user["id"]))
+            else:
+                info_submitted = bool(db.is_writer_registered(user["id"]))
 
-    access_token = create_access_token({
-        "sub": str(user["id"]),
-        "info_submitted": info_submitted
-    })
-    refresh_token = create_refresh_token({
-        "sub": str(user["id"]),
-        "info_submitted": info_submitted
-    })
+            access_token = create_access_token({
+                "sub": str(user["id"]),
+                "info_submitted": info_submitted
+            })
+            refresh_token = create_refresh_token({
+                "sub": str(user["id"]),
+                "info_submitted": info_submitted
+            })
 
-    user_data = {k: v for k, v in user.items() if k not in ("email", "password_hash")}
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "info_submitted": info_submitted,
-        "user": user_data
-    }
+            user_data = {k: v for k, v in user.items() if k not in ("email", "password_hash")}
+            return {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "info_submitted": info_submitted,
+                "user": user_data
+            }
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in verify_otp: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in verify_otp: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/login")
 def login(data: LoginRequest):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
 
-    user = db.get_user_by_email(data.email)
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found")
-    
-    if not user["is_registered"]:
-        raise HTTPException(status_code=400, detail="User not verified. Please verify your email first.")
-    
-    if not verify_password(data.password, user["password_hash"]):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+            user = db.get_user_by_email(data.email)
+            if not user:
+                raise HTTPException(status_code=400, detail="User not found")
 
-    # Decide check based on role
-    role = user.get("role")
-    if role == "vocalist":
-        info_submitted = bool(db.is_vocalist_registered(user["id"]))
-    else:
-        info_submitted = bool(db.is_writer_registered(user["id"]))
+            if not user["is_registered"]:
+                raise HTTPException(status_code=400, detail="User not verified. Please verify your email first.")
 
-    access_token = create_access_token({
-        "sub": str(user["id"]),
-        "info_submitted": info_submitted
-    })
-    refresh_token = create_refresh_token({
-        "sub": str(user["id"]),
-        "info_submitted": info_submitted
-    })
+            if not verify_password(data.password, user["password_hash"]):
+                raise HTTPException(status_code=400, detail="Invalid credentials")
 
-    user_data = {k: v for k, v in user.items() if k not in ("email", "password_hash")}
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "info_submitted": info_submitted,
-        "user": user_data
-    }
+            # Decide check based on role
+            role = user.get("role")
+            if role == "vocalist":
+                info_submitted = bool(db.is_vocalist_registered(user["id"]))
+            else:
+                info_submitted = bool(db.is_writer_registered(user["id"]))
+
+            access_token = create_access_token({
+                "sub": str(user["id"]),
+                "info_submitted": info_submitted
+            })
+            refresh_token = create_refresh_token({
+                "sub": str(user["id"]),
+                "info_submitted": info_submitted
+            })
+
+            user_data = {k: v for k, v in user.items() if k not in ("email", "password_hash")}
+            return {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "info_submitted": info_submitted,
+                "user": user_data
+            }
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in login: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in login: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 
    
 
 @router.post("/resend-otp")
 def resend_otp(data: ResendOTPRequest):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
 
-    user = db.get_user_by_email(data.email)
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found")
-    if user["is_registered"]:
-        raise HTTPException(status_code=400, detail="User already verified")
+            user = db.get_user_by_email(data.email)
+            if not user:
+                raise HTTPException(status_code=400, detail="User not found")
+            if user["is_registered"]:
+                raise HTTPException(status_code=400, detail="User already verified")
 
-    otp = generate_otp()
-    otp_expiry = get_otp_expiry()
-    db.resend_otp(data.email, otp, otp_expiry)
-    send_otp_email(data.email, otp)
-    return {"message": "OTP resent successfully."}
+            otp = generate_otp()
+            otp_expiry = get_otp_expiry()
+            db.resend_otp(data.email, otp, otp_expiry)
+            send_otp_email(data.email, otp)
+            return {"message": "OTP resent successfully."}
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in resend_otp: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in resend_otp: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 
 
 
 @router.post("/forgot-password")
 def forgot_password(data: ForgotPasswordRequest):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
 
-    user = db.get_user_by_email(data.email)
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found")
+            user = db.get_user_by_email(data.email)
+            if not user:
+                raise HTTPException(status_code=400, detail="User not found")
 
-    otp = generate_otp()
-    otp_expiry = get_otp_expiry()
-    db.resend_otp(data.email, otp, otp_expiry)  # Reuse resend_otp for storing OTP
-    send_otp_email(data.email, otp)
-    
-    return {"message": "OTP sent to your email for password reset"}
+            otp = generate_otp()
+            otp_expiry = get_otp_expiry()
+            db.resend_otp(data.email, otp, otp_expiry)  # Reuse resend_otp for storing OTP
+            send_otp_email(data.email, otp)
+
+            return {"message": "OTP sent to your email for password reset"}
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in forgot_password: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in forgot_password: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 # ---------- Reset Password ----------
 
 @router.post("/reset-password")
 def reset_password(data: ResetPasswordRequest):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
 
-    user = db.get_user_by_email(data.email)
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found")
+            user = db.get_user_by_email(data.email)
+            if not user:
+                raise HTTPException(status_code=400, detail="User not found")
 
-    verified_user, msg = db.verify_otp_and_register(data.email, data.otp)
-    if not verified_user:
-        raise HTTPException(status_code=400, detail=msg)
+            verified_user, msg = db.verify_otp_and_register(data.email, data.otp)
+            if not verified_user:
+                raise HTTPException(status_code=400, detail=msg)
 
-    hashed = hash_password(data.new_password)
-    db.update_password(data.email, hashed)  # You need to implement update_password in UserQueries
+            hashed = hash_password(data.new_password)
+            db.update_password(data.email, hashed)  # You need to implement update_password in UserQueries
 
-    return {"message": "Password reset successfully"}
+            return {"message": "Password reset successfully"}
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in reset_password: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in reset_password: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/refresh-token")
 def refresh_token(data: RefreshTokenRequest):
@@ -227,42 +288,67 @@ def refresh_token(data: RefreshTokenRequest):
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
-    user = db.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
+            user = db.get_user_by_id(user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
 
-    new_access_token = create_access_token({"sub": str(user_id)})
+            new_access_token = create_access_token({"sub": str(user_id)})
 
-    return {
-        "access_token": new_access_token,
-        "token_type": "bearer"
-    }
+            return {
+                "access_token": new_access_token,
+                "token_type": "bearer"
+            }
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in refresh_token: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in refresh_token: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
     
     
 @router.post("/change-password")
 def change_password(data: ChangePasswordRequest):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        try:
+            db = Queries(conn)
 
-    user = db.get_user_by_email(data.email)
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found")
+            user = db.get_user_by_email(data.email)
+            if not user:
+                raise HTTPException(status_code=400, detail="User not found")
 
-    if not verify_password(data.old_password, user["password_hash"]):
-        raise HTTPException(status_code=400, detail="Old password is incorrect")
+            if not verify_password(data.old_password, user["password_hash"]):
+                raise HTTPException(status_code=400, detail="Old password is incorrect")
 
-    hashed_new = hash_password(data.new_password)
-    db.update_password(data.email, hashed_new)
+            hashed_new = hash_password(data.new_password)
+            db.update_password(data.email, hashed_new)
 
-    return {"message": "Password changed successfully"}
+            return {"message": "Password changed successfully"}
+        except psycopg2.Error as e:
+            # Rollback any failed transaction
+            conn.rollback()
+            print(f"Database error in change_password: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception as e:
+            # Handle any other exceptions
+            print(f"Error in change_password: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 
 
 @router.post("/google-auth")
 def google_auth(data: GoogleAuthRequest):
-    result, error = google_login_or_signup(data.token, data.role)
-    if error:
-        raise HTTPException(status_code=400, detail=error)
-    return result
+    try:
+        result, error = google_login_or_signup(data.token, data.role)
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+        return result
+    except Exception as e:
+        # Handle any exceptions
+        print(f"Error in google_auth: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

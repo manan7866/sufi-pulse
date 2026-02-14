@@ -137,6 +137,21 @@ ENV/
 env.bak/
 venv.bak/
 
+
+# test file
+test_db_connection.py
+test_db_queries.py
+test_hashing.py
+test_login.py
+verify_admin.py
+verify_db.py
+check_db_config.py
+check_dump_format.py
+check_env.py
+debug_login.py
+add_adimin_user.py
+
+
 # Spyder project settings
 .spyderproject
 .spyproject
