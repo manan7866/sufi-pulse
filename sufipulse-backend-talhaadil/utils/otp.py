@@ -99,7 +99,7 @@ def send_template_email(to_email: str, template_id: str, subject: str, variables
             "to": [to_email],
             "subject": subject
         }
-        
+
         if variables:
             params["template"] = {
                 "id": template_id,
@@ -115,7 +115,45 @@ def send_template_email(to_email: str, template_id: str, subject: str, variables
         return email
     except Exception as e:
         print(f"Error sending template email: {str(e)}")
-        raise e
+        # Fallback to a simple HTML email if template fails
+        html_content = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+            <div style="max-width: 500px; margin: auto; background: #ffffff; border-radius: 12px;
+                        padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #065f46; margin: 0;">Sufi Pulse</h2>
+                <p style="color: #555; margin: 5px 0;">Your trusted spiritual companion</p>
+              </div>
+
+              <p style="color: #333; font-size: 15px;">
+                Dear User,<br><br>
+                {subject}: This is a notification from Sufi Pulse.
+              </p>
+
+              <p style="color: #555; font-size: 14px;">
+                Thank you for using our platform.
+              </p>
+
+              <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">
+                © {datetime.now().year} Sufi Pulse. All rights reserved.
+              </p>
+            </div>
+          </body>
+        </html>
+        """
+
+        fallback_params = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+            "text": f"Sufi Pulse Notification: {subject}"
+        }
+
+        email = resend.Emails.send(fallback_params)
+        print(f"Fallback template email sent successfully with ID: {email['id']}")
+        return email
 
 def send_collaboration_proposal_email(to_email: str):
     """Send collaboration proposal received email"""
@@ -139,5 +177,13 @@ def send_welcome_email(to_email: str):
         to_email=to_email,
         template_id="account-welcome",
         subject="Welcome to Sufi Pulse"
+    )
+
+def send_studio_visit_request_email(to_email: str):
+    """Send studio visit request confirmation email"""
+    return send_template_email(
+        to_email=to_email,
+        template_id="studio-visit-request-confirmation",
+        subject="Studio Visit Request Submitted"
     )
 

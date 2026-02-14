@@ -91,24 +91,33 @@ def create_studio_visit_request(
     data: StudioVisitRequestCreate,
     user_id: int = Depends(get_current_user)
 ):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        db = Queries(conn)
 
-    user = db.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    if user.get("role") != "vocalist":
-        raise HTTPException(status_code=403, detail="Only vocalists can create studio visit requests")
+        if user.get("role") != "vocalist":
+            raise HTTPException(status_code=403, detail="Only vocalists can create studio visit requests")
 
-    if data.vocalist_id != int(user.get("id")):
-        raise HTTPException(status_code=403, detail="Vocalist ID must match authenticated user")
+        if data.vocalist_id != int(user.get("id")):
+            raise HTTPException(status_code=403, detail="Vocalist ID must match authenticated user")
 
-    result = db.create_studio_visit_request(data.dict())
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to create studio visit request")
+        result = db.create_studio_visit_request(data.dict())
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create studio visit request")
 
-    return StudioVisitRequestResponse(**result)
+        # Send studio visit request confirmation email
+        try:
+            from utils.otp import send_studio_visit_request_email
+            # Use the email from the request data
+            send_studio_visit_request_email(data.email)
+        except Exception as e:
+            print(f"Failed to send studio visit request confirmation email: {e}")
+            # Don't fail the request if email fails, just log the error
+
+        return StudioVisitRequestResponse(**result)
 
 @router.get("/studio-visit-requests", response_model=list[StudioVisitRequestResponse])
 def get_all_studio_visit_requests(user_id: int = Depends(get_current_user)):
@@ -145,64 +154,73 @@ def create_remote_recording_request(
     data: RemoteRecordingRequestCreate,
     user_id: int = Depends(get_current_user)
 ):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        db = Queries(conn)
 
-    user = db.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    if user.get("role") != "vocalist":
-        raise HTTPException(status_code=403, detail="Only vocalists can create remote recording requests")
+        if user.get("role") != "vocalist":
+            raise HTTPException(status_code=403, detail="Only vocalists can create remote recording requests")
 
-    if data.vocalist_id != int(user.get("id")):
-        raise HTTPException(status_code=403, detail="Vocalist ID must match authenticated user")
+        if data.vocalist_id != int(user.get("id")):
+            raise HTTPException(status_code=403, detail="Vocalist ID must match authenticated user")
 
-    result = db.create_remote_recording_request(data.dict())
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to create remote recording request")
+        result = db.create_remote_recording_request(data.dict())
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create remote recording request")
 
-    return RemoteRecordingRequestResponse(**result)
+        # Send recording session confirmation email
+        try:
+            from utils.otp import send_recording_session_confirmation_email
+            # Use the email from the request data
+            send_recording_session_confirmation_email(data.email)
+        except Exception as e:
+            print(f"Failed to send recording session confirmation email: {e}")
+            # Don't fail the request if email fails, just log the error
+
+        return RemoteRecordingRequestResponse(**result)
 
 @router.get("/remote-recording-requests", response_model=list[RemoteRecordingRequestResponse])
 def get_all_remote_recording_requests(user_id: int = Depends(get_current_user)):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        db = Queries(conn)
 
-    user = db.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    if user.get("role") not in ['admin','sub-admin']:
-        raise HTTPException(status_code=403, detail="Only admins can view all remote recording requests")
+        if user.get("role") not in ['admin','sub-admin']:
+            raise HTTPException(status_code=403, detail="Only admins can view all remote recording requests")
 
-    requests = db.get_all_remote_recording_requests()
-    return [RemoteRecordingRequestResponse(**req) for req in requests]
+        requests = db.get_all_remote_recording_requests()
+        return [RemoteRecordingRequestResponse(**req) for req in requests]
 
 @router.get("/remote-recording-requests/vocalist", response_model=list[RemoteRecordingRequestResponse])
 def get_remote_recording_requests_by_vocalist(user_id: int = Depends(get_current_user)):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        db = Queries(conn)
 
-    user = db.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = db.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    if user.get("role") != "vocalist":
-        raise HTTPException(status_code=403, detail="Only vocalists can view their remote recording requests")
+        if user.get("role") != "vocalist":
+            raise HTTPException(status_code=403, detail="Only vocalists can view their remote recording requests")
 
-    requests = db.get_remote_recording_requests_by_vocalist(int(user.get("id")))
-    return [RemoteRecordingRequestResponse(**req) for req in requests]
+        requests = db.get_remote_recording_requests_by_vocalist(int(user.get("id")))
+        return [RemoteRecordingRequestResponse(**req) for req in requests]
 
 
 
 
 @router.get("/check-request-exists/{vocalist_id}/{kalam_id}")
 def check_request_exists(vocalist_id: int, kalam_id: int, user_id: int = Depends(get_current_user)):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
+    with DBConnection.get_db_connection() as conn:
+        db = Queries(conn)
 
-    studio_conflict = db.studio_request_exists(vocalist_id, kalam_id)
-    remote_conflict = db.remote_request_exists(vocalist_id, kalam_id)
+        studio_conflict = db.studio_request_exists(vocalist_id, kalam_id)
+        remote_conflict = db.remote_request_exists(vocalist_id, kalam_id)
 
-    return {"is_booked": studio_conflict or remote_conflict}
+        return {"is_booked": studio_conflict or remote_conflict}

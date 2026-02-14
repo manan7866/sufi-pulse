@@ -40,54 +40,62 @@ class PartnershipProposalResponse(BaseModel):
 @router.post("/", response_model=PartnershipProposalResponse)
 def create_partnership_proposal(
     data: PartnershipProposalCreate,
-    
-):
-    conn = DBConnection.get_connection()
-    db = Queries(conn)
-   
-    query = """
-    INSERT INTO partnership_proposals (
-        full_name, email, organization_name, role_title, organization_type,
-        partnership_type, website, proposal_text, proposed_timeline,
-        resources, goals, sacred_alignment
-    )
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    RETURNING *
-    """
-    with conn.cursor() as cur:
-        cur.execute(query, (
-            data.full_name,
-            data.email,
-            data.organization_name,
-            data.role_title,
-            data.organization_type,
-            data.partnership_type,
-            data.website,
-            data.proposal_text,
-            data.proposed_timeline,
-            data.resources,
-            data.goals,
-            data.sacred_alignment
-        ))
-        proposal = cur.fetchone()
-        conn.commit()
 
-    return PartnershipProposalResponse(
-        id=proposal[0],
-        full_name=proposal[1],
-        email=proposal[2],
-        organization_name=proposal[3],
-        role_title=proposal[4],
-        organization_type=proposal[5],
-        partnership_type=proposal[6],
-        website=proposal[7],
-        proposal_text=proposal[8],
-        proposed_timeline=proposal[9],
-        resources=proposal[10],
-        goals=proposal[11],
-        sacred_alignment=proposal[12],
-        created_at=str(proposal[13])
-    )
+):
+    with DBConnection.get_db_connection() as conn:
+        db = Queries(conn)
+
+        query = """
+        INSERT INTO partnership_proposals (
+            full_name, email, organization_name, role_title, organization_type,
+            partnership_type, website, proposal_text, proposed_timeline,
+            resources, goals, sacred_alignment
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING *
+        """
+        with conn.cursor() as cur:
+            cur.execute(query, (
+                data.full_name,
+                data.email,
+                data.organization_name,
+                data.role_title,
+                data.organization_type,
+                data.partnership_type,
+                data.website,
+                data.proposal_text,
+                data.proposed_timeline,
+                data.resources,
+                data.goals,
+                data.sacred_alignment
+            ))
+            proposal = cur.fetchone()
+            conn.commit()
+
+        # Send collaboration proposal received email
+        try:
+            from utils.otp import send_collaboration_proposal_email
+            send_collaboration_proposal_email(data.email)
+        except Exception as e:
+            print(f"Failed to send collaboration proposal email: {e}")
+            # Don't fail the request if email fails, just log the error
+
+        return PartnershipProposalResponse(
+            id=proposal[0],
+            full_name=proposal[1],
+            email=proposal[2],
+            organization_name=proposal[3],
+            role_title=proposal[4],
+            organization_type=proposal[5],
+            partnership_type=proposal[6],
+            website=proposal[7],
+            proposal_text=proposal[8],
+            proposed_timeline=proposal[9],
+            resources=proposal[10],
+            goals=proposal[11],
+            sacred_alignment=proposal[12],
+            created_at=str(proposal[13])
+        )
 
 
 
