@@ -64,9 +64,31 @@ def signup(data: SignUpRequest):
         try:
             db = Queries(conn)
 
-            if db.get_user_by_email(data.email):
-                raise HTTPException(status_code=400, detail="User already exists")
+            existing_user = db.get_user_by_email(data.email)
+            if existing_user:
+                # Check if user is already verified
+                if existing_user["is_registered"]:
+                    raise HTTPException(status_code=400, detail="User already exists")
+                else:
+                    # User exists but not verified, allow to continue with verification
+                    # Generate new OTP and update user
+                    otp = generate_otp()
+                    otp_expiry = get_otp_expiry()
+                    
+                    db.resend_otp(data.email, otp, otp_expiry)
+                    
+                    # Send new OTP email
+                    try:
+                        send_otp_email(data.email, otp)
+                        return {"message": "User exists but not verified. New OTP sent to your email."}
+                    except Exception as email_error:
+                        print(f"Email sending failed: {email_error}")
+                        return {
+                            "message": "User exists but not verified. New OTP generated, but there was an issue sending the email. Please contact support.",
+                            "user_exists_unverified": True
+                        }
 
+            # If user doesn't exist, create new user
             hashed = hash_password(data.password)
             otp = generate_otp()
             otp_expiry = get_otp_expiry()
@@ -82,8 +104,20 @@ def signup(data: SignUpRequest):
                 otp_expiry=otp_expiry
             )
 
-            send_otp_email(data.email, otp)
-            return {"message": "User created. OTP sent to your email."}
+            # Send OTP email, but handle errors gracefully
+            try:
+                send_otp_email(data.email, otp)
+                return {"message": "User created. OTP sent to your email."}
+            except Exception as email_error:
+                print(f"Email sending failed, but user created: {email_error}")
+                # Return success even if email fails, but indicate the issue
+                return {
+                    "message": "User created successfully, but there was an issue sending the OTP email. Please contact support.",
+                    "user_created": True
+                }
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 400 for user exists, 403 for admin signup)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -128,6 +162,9 @@ def verify_otp(data: OTPVerifyRequest):
                 "info_submitted": info_submitted,
                 "user": user_data
             }
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 400 for invalid OTP)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -179,6 +216,9 @@ def login(data: LoginRequest):
                 "info_submitted": info_submitted,
                 "user": user_data
             }
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 400 for invalid credentials)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -207,8 +247,21 @@ def resend_otp(data: ResendOTPRequest):
             otp = generate_otp()
             otp_expiry = get_otp_expiry()
             db.resend_otp(data.email, otp, otp_expiry)
-            send_otp_email(data.email, otp)
-            return {"message": "OTP resent successfully."}
+            
+            # Send OTP email, but handle errors gracefully
+            try:
+                send_otp_email(data.email, otp)
+                return {"message": "OTP resent successfully."}
+            except Exception as email_error:
+                print(f"Email sending failed when resending OTP: {email_error}")
+                # Return success even if email fails, but indicate the issue
+                return {
+                    "message": "OTP generated successfully, but there was an issue sending the email. Please contact support.",
+                    "otp_sent": False
+                }
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 400 for user not found)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -235,9 +288,21 @@ def forgot_password(data: ForgotPasswordRequest):
             otp = generate_otp()
             otp_expiry = get_otp_expiry()
             db.resend_otp(data.email, otp, otp_expiry)  # Reuse resend_otp for storing OTP
-            send_otp_email(data.email, otp)
-
-            return {"message": "OTP sent to your email for password reset"}
+            
+            # Send OTP email, but handle errors gracefully
+            try:
+                send_otp_email(data.email, otp)
+                return {"message": "OTP sent to your email for password reset"}
+            except Exception as email_error:
+                print(f"Email sending failed for password reset: {email_error}")
+                # Return success even if email fails, but indicate the issue
+                return {
+                    "message": "Password reset initiated, but there was an issue sending the OTP email. Please contact support.",
+                    "email_sent": False
+                }
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 400 for user not found)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -268,6 +333,9 @@ def reset_password(data: ResetPasswordRequest):
             db.update_password(data.email, hashed)  # You need to implement update_password in UserQueries
 
             return {"message": "Password reset successfully"}
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 400 for invalid OTP)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -301,6 +369,9 @@ def refresh_token(data: RefreshTokenRequest):
                 "access_token": new_access_token,
                 "token_type": "bearer"
             }
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 401, 404)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -329,6 +400,9 @@ def change_password(data: ChangePasswordRequest):
             db.update_password(data.email, hashed_new)
 
             return {"message": "Password changed successfully"}
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 400 for invalid credentials)
+            raise
         except psycopg2.Error as e:
             # Rollback any failed transaction
             conn.rollback()
@@ -348,7 +422,10 @@ def google_auth(data: GoogleAuthRequest):
         if error:
             raise HTTPException(status_code=400, detail=error)
         return result
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 400 for invalid token)
+        raise
     except Exception as e:
-        # Handle any exceptions
+        # Handle any other exceptions
         print(f"Error in google_auth: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

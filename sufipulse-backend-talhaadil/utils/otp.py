@@ -4,7 +4,8 @@ from datetime import datetime, timedelta, timezone
 import os
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.local'))
+# Load environment variables from the main .env file
+load_dotenv()
 
 # Initialize Resend with API key
 resend.api_key = os.getenv('RESEND_API_KEY')
