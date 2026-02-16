@@ -7,7 +7,7 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     password_hash TEXT NOT NULL,
     permissions JSONB DEFAULT '{}'::jsonb,
-    role VARCHAR(50) CHECK (role IN ('writer', 'vocalist', 'admin')),
+    role VARCHAR(50) CHECK (role IN ('writer', 'vocalist', 'blogger', 'admin')),
     country VARCHAR(100),
     city VARCHAR(100),
     is_registered BOOLEAN DEFAULT FALSE,
@@ -64,6 +64,30 @@ CREATE TABLE writers (
 
 CREATE INDEX idx_writer_user_id ON writers(user_id);
 
+-- =========================
+-- BLOGGERS
+-- =========================
+CREATE TABLE bloggers (
+    id SERIAL PRIMARY KEY,
+    user_id INT UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    author_name VARCHAR(255),
+    author_image_url TEXT,
+    short_bio TEXT,
+    location VARCHAR(255),
+    website_url TEXT,
+    social_links JSONB DEFAULT '{}'::jsonb,
+    publish_pseudonym BOOLEAN DEFAULT FALSE,
+    original_work_confirmation BOOLEAN DEFAULT FALSE,
+    publishing_rights_granted BOOLEAN DEFAULT FALSE,
+    discourse_policy_agreed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Recommended Indexes
+CREATE INDEX idx_bloggers_user_id ON bloggers(user_id);
+CREATE INDEX idx_bloggers_created_at ON bloggers(created_at);
+
 CREATE TABLE kalams (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -109,6 +133,45 @@ CREATE TABLE kalam_submissions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- =========================
+-- BLOG SUBMISSIONS
+-- =========================
+CREATE TABLE blog_submissions (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(120) NOT NULL,
+    excerpt TEXT,
+    featured_image_url TEXT,
+    content TEXT NOT NULL,
+    user_id INT REFERENCES users(id),
+    status VARCHAR(50) CHECK (
+        status IN (
+            'pending',
+            'review',
+            'approved',
+            'revision',
+            'rejected',
+            'posted'
+        )
+    ) DEFAULT 'pending',
+    category VARCHAR(100),
+    tags TEXT[],
+    language VARCHAR(50),
+    admin_comments TEXT,
+    editor_notes TEXT,
+    scheduled_publish_date TIMESTAMP,
+    seo_meta_title VARCHAR(255),
+    seo_meta_description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Recommended Indexes
+CREATE INDEX idx_blog_submissions_user_id ON blog_submissions(user_id);
+CREATE INDEX idx_blog_submissions_status ON blog_submissions(status);
+CREATE INDEX idx_blog_submissions_category ON blog_submissions(category);
+CREATE INDEX idx_blog_submissions_language ON blog_submissions(language);
+CREATE INDEX idx_blog_submissions_created_at ON blog_submissions(created_at);
 
 
 -- =========================
@@ -180,7 +243,7 @@ CREATE TABLE notifications (
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     target_type VARCHAR(50) NOT NULL CHECK (
-        target_type IN ('all', 'writers', 'vocalists', 'specific')
+        target_type IN ('all', 'writers', 'vocalists', 'bloggers', 'specific')
     ),
     target_user_ids INT[] DEFAULT '{}',  -- used only for 'specific'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

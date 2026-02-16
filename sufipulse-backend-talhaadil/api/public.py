@@ -163,8 +163,26 @@ def get_writers(
 def get_all_special_recognitions():
     conn = DBConnection.get_connection()
     db = Queries(conn)
-    
+
     try:
         return db.fetch_all_special_recognitions()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/blogs", response_model=List[dict])
+def get_approved_blogs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(6, ge=1),
+    category: Optional[str] = None,
+    search: Optional[str] = None
+):
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+    
+    try:
+        # Fetch only approved and posted blogs
+        blogs = db.fetch_approved_blogs(skip, limit, category, search)
+        return blogs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

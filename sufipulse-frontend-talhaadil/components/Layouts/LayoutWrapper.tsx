@@ -7,6 +7,7 @@ import Footer from "../Footer";
 import VocalistLayout from "./VocalistLayout";
 import WriterDashboardLayout from "./WriterDashboard";
 import AdminLayout from "./AdminLayout";
+import BloggerDashboardLayout from "./BloggerDashboard";
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,6 +21,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   }
   if (pathname?.startsWith("/writer") && pathname !== "/writer-faqs") {
     return <WriterDashboardLayout>{children}</WriterDashboardLayout>;
+  }
+  if (pathname?.startsWith("/blogger") && pathname !== "/blogger-how-it-works") {
+    return <BloggerDashboardLayout>{children}</BloggerDashboardLayout>;
   }
 
   if (pathname?.startsWith("/admin")) {

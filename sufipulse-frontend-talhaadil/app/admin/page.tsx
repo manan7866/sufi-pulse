@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react"
 import StatsCard from "@/components/StatsCard"
 import Chart from "@/components/Chart"
-import { getAllVocalists, getAllWriters, getAllKalams } from "@/services/admin"
+import { getAllVocalists, getAllWriters, getAllBloggers, getAllKalams, getAllBlogSubmissions } from "@/services/admin"
 import { getAllRemoteRecordingRequests, getAllStudioVisitRequests } from "@/services/requests"
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     totalVocalists: 0,
     totalWriters: 0,
+    totalBloggers: 0,
     totalKalams: 0,
+    totalBlogs: 0,
     totalStudioRequests: 0,
     totalRemoteRequests: 0,
   })
@@ -18,7 +20,9 @@ export default function AdminDashboard() {
   const [chartData, setChartData] = useState([
     { name: "Vocalists", value: 0 },
     { name: "Writers", value: 0 },
+    { name: "Bloggers", value: 0 },
     { name: "Kalams", value: 0 },
+    { name: "Blogs", value: 0 },
     { name: "Studio Req", value: 0 },
     { name: "Remote Req", value: 0 },
   ])
@@ -30,30 +34,38 @@ export default function AdminDashboard() {
       try {
         console.log("[v0] Fetching dashboard data...")
 
-        const [vocalistsRes, writersRes, kalamsRes, studioRes, remoteRes] = await Promise.all([
+        const [vocalistsRes, writersRes, bloggersRes, kalamsRes, blogsRes, studioRes, remoteRes] = await Promise.all([
           getAllVocalists(),
           getAllWriters(),
+          getAllBloggers(),
           getAllKalams(),
+          getAllBlogSubmissions(),
           getAllStudioVisitRequests(),
           getAllRemoteRecordingRequests(),
         ])
 
         console.log("[v0] Vocalists response:", vocalistsRes.data)
         console.log("[v0] Writers response:", writersRes.data)
+        console.log("[v0] Bloggers response:", bloggersRes.data)
         console.log("[v0] Kalams response:", kalamsRes.data)
+        console.log("[v0] Blogs response:", blogsRes.data)
         console.log("[v0] Studio requests response:", studioRes.data)
         console.log("[v0] Remote requests response:", remoteRes.data)
 
         const vocalistsCount = vocalistsRes.data?.vocalists?.length || 0
         const writersCount = writersRes.data?.writers?.length || 0
+        const bloggersCount = bloggersRes.data?.bloggers?.length || 0
         const kalamsCount = kalamsRes.data?.kalams?.length || 0
+        const blogsCount = blogsRes.data?.blogs?.length || 0
         const studioCount = Array.isArray(studioRes.data) ? studioRes.data.length : 0
         const remoteCount = Array.isArray(remoteRes.data) ? remoteRes.data.length : 0
 
         setStats({
           totalVocalists: vocalistsCount,
           totalWriters: writersCount,
+          totalBloggers: bloggersCount,
           totalKalams: kalamsCount,
+          totalBlogs: blogsCount,
           totalStudioRequests: studioCount,
           totalRemoteRequests: remoteCount,
         })
@@ -61,7 +73,9 @@ export default function AdminDashboard() {
         setChartData([
           { name: "Vocalists", value: vocalistsCount },
           { name: "Writers", value: writersCount },
+          { name: "Bloggers", value: bloggersCount },
           { name: "Kalams", value: kalamsCount },
+          { name: "Blogs", value: blogsCount },
           { name: "Studio Req", value: studioCount },
           { name: "Remote Req", value: remoteCount },
         ])

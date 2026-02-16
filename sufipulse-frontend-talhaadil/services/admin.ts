@@ -16,6 +16,14 @@ export const getAllWriters = () => {
   });
 };
 
+export const getAllBloggers = () => {
+  return api.get("/admin/bloggers", {
+    headers: {
+      requiresAuth: true,
+    },
+  });
+};
+
 export const getKalamsByWriter = (userId: number) => {
   return api.get(`/admin/kalams/writer/${userId}`, {
     headers: {
@@ -101,6 +109,14 @@ export const getAllPartnershipProposals = async () => {
       },
     });
   };
+
+export const getAllBlogSubmissions = () => {
+  return api.get("/admin/blog-submissions", {
+    headers: {
+      requiresAuth: true,
+    },
+  });
+};
   
 
 

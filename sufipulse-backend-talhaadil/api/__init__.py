@@ -7,4 +7,5 @@ from .studio import router as studio_router
 from .notifications import router as notification_router
 from .public import router as public_router
 from .writer import router as writer_router
+from .blogger import router as blogger_router
 from .youtube import router as youtube_router

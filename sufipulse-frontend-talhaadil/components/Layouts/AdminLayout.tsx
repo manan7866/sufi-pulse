@@ -17,13 +17,14 @@ const menuItems = [
   // { name: "Dashboard", href: "/admin", icon: LayoutDashboard, permissionKey: "dashboard" },
   { name: "Vocalists", href: "/admin/vocalists", icon: Mic, permissionKey: "vocalist" },
   { name: "Writers", href: "/admin/writers", icon: PenTool, permissionKey: "writer" },
+  { name: "Bloggers", href: "/admin/bloggers", icon: PenTool, permissionKey: "blogger" },
   { name: "Kalams", href: "/admin/kalams", icon: BookText, permissionKey: "kalams" },
   { name: "Studio Requests", href: "/admin/studio-requests", icon: Building, permissionKey: "requests" },
   { name: "Remote Requests", href: "/admin/remote-requests", icon: Globe, permissionKey: "requests" },
   { name: "Partnership", href: "/admin/partnership", icon: Handshake, permissionKey: "partnership_proposal" },
   { name: "Notification", href: "/admin/notifications", icon: Bell, permissionKey: "notification" },
   { name: "Sub Admins", href: "/admin/other-admins", icon: User2, permissionKey: "sub_admins" },
-  { name: "Blogs", href: "/admin/blog", icon: BiLogIn, permissionKey: "blog" },
+  { name: "Blogs", href: "/admin/blogs", icon: BiLogIn, permissionKey: "blog" },
   { name: "Special Recognition", href: "/admin/special", icon: Trophy, permissionKey: "recognitions" }
 ];
 

@@ -139,3 +139,17 @@ export const getGuestPosts = (params: { skip?: number; limit?: number } = {}) =>
     },
   });
 };
+
+export const getApprovedBlogs = (params: { skip?: number; limit?: number; category?: string; search?: string } = {}) => {
+  return api.get("/public/blogs", {
+    params: {
+      skip: params.skip ?? 0,
+      limit: params.limit ?? 6,
+      category: params.category,
+      search: params.search,
+    },
+    headers: {
+      requiresAuth: false,
+    },
+  });
+};

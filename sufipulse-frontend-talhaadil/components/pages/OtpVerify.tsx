@@ -121,7 +121,30 @@ const OTPVerification: React.FC<OTPVerificationProps> = ({ email, onVerified, on
         Cookies.set("info_submitted", data.info_submitted)
         Cookies.set("permissions", JSON.stringify(data.user.permissions))
 
-        router.push("/");
+        // Redirect based on user role
+        const userRole = data.user.role;
+        if (userRole === 'blogger') {
+          if (data.info_submitted) {
+            router.push("/blogger/dashboard"); // Go to dashboard if profile is complete
+          } else {
+            router.push("/blogger/profile"); // Go to profile to complete registration
+          }
+        } else if (userRole === 'writer') {
+          if (data.info_submitted) {
+            router.push("/writer/dashboard"); // Go to dashboard if profile is complete
+          } else {
+            router.push("/writer/profile"); // Go to profile to complete registration
+          }
+        } else if (userRole === 'vocalist') {
+          if (data.info_submitted) {
+            router.push("/vocalist/dashboard"); // Go to dashboard if profile is complete
+          } else {
+            router.push("/vocalist/profile"); // Go to profile to complete registration
+          }
+        } else {
+          // Default fallback
+          router.push("/");
+        }
       }
 
 

@@ -21,7 +21,7 @@ const Navbar = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasEverRegistered, setHasEverRegistered] = useState(false);
   const [userRole, setUserRole] = useState<
-    "writer" | "vocalist" | "super_admin" | "moderator" | "collaborator" | "hello"
+    "writer" | "vocalist" | "blogger" | "super_admin" | "moderator" | "collaborator" | "hello"
   >("hello");
   const [userName, setUserName] = useState("User");
 
@@ -84,6 +84,8 @@ const Navbar = () => {
         return "/writer/kalams";
       case "vocalist":
         return "/vocalist/profile";
+      case "blogger":
+        return "/blogger/dashboard";
       case "super_admin":
       case "moderator":
       case "collaborator":
@@ -99,6 +101,8 @@ const Navbar = () => {
         return "/contact?type=writer";
       case "vocalist":
         return "/contact?type=vocalist";
+      case "blogger":
+        return "/blogger/write";
       case "super_admin":
       case "moderator":
       case "collaborator":
@@ -114,6 +118,8 @@ const Navbar = () => {
         return "Submit New Kalam";
       case "vocalist":
         return "Join New Project";
+      case "blogger":
+        return "Write New Blog";
       case "super_admin":
       case "moderator":
       case "collaborator":

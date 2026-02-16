@@ -21,15 +21,15 @@ import {
   PenTool,
   Mic,
 } from 'lucide-react';
-import { getGuestPosts } from '@/services/requests';
+import { getApprovedBlogs } from '@/services/requests';
 import { incrementMonthly, incrementWeekly } from '@/lib/increment';
 
-// Predefined list of possible categories from the API (lowercase)
+// Predefined list of possible categories from the API (matching blogger categories)
 const possibleCategories = [
   { id: 'sufi poetry', label: 'Sufi Poetry' },
-  { id: 'spirituality', label: 'Spirituality' },
-  { id: 'culture', label: 'Culture' },
-  { id: 'music', label: 'Music' },
+  { id: 'sufi history', label: 'Sufi History' },
+  { id: 'sufi personalities', label: 'Sufi Personalities' },
+  { id: 'sufi inquiry', label: 'Sufi Inquiry' },
 ];
 
 const GuestBlogs = () => {
@@ -59,13 +59,13 @@ const GuestBlogs = () => {
     const counts = {
       all: posts.length,
       'sufi poetry': 0,
-      spirituality: 0,
-      culture: 0,
-      music: 0,
+      'sufi history': 0,
+      'sufi personalities': 0,
+      'sufi inquiry': 0,
     };
 
     posts.forEach((post) => {
-      const category = post.category.toLowerCase();
+      const category = post.category ? post.category.toLowerCase() : '';
       if (counts.hasOwnProperty(category)) {
         counts[category]++;
       }
@@ -84,7 +84,13 @@ const GuestBlogs = () => {
   const fetchPosts = async (reset = false) => {
     setLoading(true);
     try {
-      const response = await getGuestPosts({ skip: reset ? 0 : skip, limit });
+      const categoryParam = activeFilter === 'all' ? undefined : activeFilter;
+      const response = await getApprovedBlogs({ 
+        skip: reset ? 0 : skip, 
+        limit,
+        category: categoryParam,
+        search: searchTerm || undefined
+      });
       const newPosts = response.data;
       setPosts((prev) => (reset ? newPosts : [...prev, ...newPosts]));
       setSkip((prev) => (reset ? limit : prev + limit));
@@ -102,15 +108,26 @@ const GuestBlogs = () => {
     fetchPosts(true);
   }, []);
 
-  // Filter posts based on category and search term
-  const filteredPosts = posts.filter((post) => {
-    const matchesFilter = activeFilter === 'all' || post.category.toLowerCase() === activeFilter;
-    const matchesSearch =
-      post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      post.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      post.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  // Refetch when filter changes
+  useEffect(() => {
+    setSkip(0);
+    setPosts([]);
+    fetchPosts(true);
+  }, [activeFilter]);
+
+  // Refetch when search term changes (debounced)
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      setSkip(0);
+      setPosts([]);
+      fetchPosts(true);
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchTerm]);
+
+  // No need for frontend filtering - done on backend
+  const filteredPosts = posts;
 
   // Handle Load More button click
   const handleLoadMore = () => {

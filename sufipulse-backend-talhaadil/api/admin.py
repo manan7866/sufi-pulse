@@ -335,6 +335,40 @@ def get_all_writers(
             ).dict() for user in users
         ]
     }
+
+
+@router.get("/bloggers")
+def get_all_bloggers(
+    current_user_id: int = Depends(get_current_user)
+):
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+    current_user = db.get_user_by_id(current_user_id)
+
+    if not current_user or current_user["role"] not in ("admin", "sub-admin"):
+        raise HTTPException(status_code=403, detail="Only admin can view bloggers")
+
+    query = """
+    SELECT id, email, name, role, country, city
+    FROM users
+    WHERE role = 'blogger'
+    """
+    with conn.cursor() as cur:
+        cur.execute(query)
+        users = cur.fetchall()
+
+    return {
+        "bloggers": [
+            UserResponse(
+                id=user[0],
+                email=user[1],
+                name=user[2],
+                role=user[3],
+                country=user[4],
+                city=user[5]
+            ).dict() for user in users
+        ]
+    }
     
 
 @router.get("/user/{user_id}", response_model=UserResponse)
@@ -468,16 +502,35 @@ def delete_special_recognition(
 ):
     conn = DBConnection.get_connection()
     db = Queries(conn)
-    
+
     user = db.get_user_by_id(user_id)  # Assume this method exists
     if user["role"] not in ["admin", "sub-admin"]:
         raise HTTPException(status_code=403, detail="Only admin or sub-admin can delete recognitions")
-    
+
     try:
         return db.delete_special_recognition(recognition_id)
     except HTTPException as e:
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/blog-submissions")
+def get_all_blog_submissions(
+    current_user_id: int = Depends(get_current_user)
+):
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+    current_user = db.get_user_by_id(current_user_id)
+
+    if not current_user or current_user["role"] not in ("admin", "sub-admin"):
+        raise HTTPException(status_code=403, detail="Only admin can view blog submissions")
+
+    # Get all blog submissions with user information
+    blogs = db.fetch_blog_submissions(skip=0, limit=100)  # Adjust limit as needed
+    
+    return {
+        "blogs": blogs
+    }
 
 

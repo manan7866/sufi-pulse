@@ -4,3 +4,4 @@ from .kalamQueries import KalamQueries
 from .studioQueries import StudioQueries
 from .notificationQueries import NotificationQueries
 from .writerQueries import WriterQueries
+from .bloggerQueries import BloggerQueries

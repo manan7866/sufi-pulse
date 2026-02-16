@@ -142,6 +142,8 @@ def verify_otp(data: OTPVerifyRequest):
             role = user.get("role")
             if role == "vocalist":
                 info_submitted = bool(db.is_vocalist_registered(user["id"]))
+            elif role == "blogger":
+                info_submitted = bool(db.is_blogger_registered(user["id"]))
             else:
                 info_submitted = bool(db.is_writer_registered(user["id"]))
 
@@ -196,6 +198,8 @@ def login(data: LoginRequest):
             role = user.get("role")
             if role == "vocalist":
                 info_submitted = bool(db.is_vocalist_registered(user["id"]))
+            elif role == "blogger":
+                info_submitted = bool(db.is_blogger_registered(user["id"]))
             else:
                 info_submitted = bool(db.is_writer_registered(user["id"]))
 

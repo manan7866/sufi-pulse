@@ -24,7 +24,7 @@ const Register = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    userType: "writer",
+    userType: "writer", // Default to writer, but can be changed to any valid option
     acceptTerms: false,
     country: "",
     city: "",
@@ -144,6 +144,12 @@ const Register = () => {
       label: "Vocalist",
       icon: Mic,
       description: "Lend your voice to divine words",
+    },
+    {
+      id: "blogger",
+      label: "Blogger",
+      icon: PenTool, // Using PenTool for blogger as well
+      description: "Share your spiritual insights",
     },
   ]
 
