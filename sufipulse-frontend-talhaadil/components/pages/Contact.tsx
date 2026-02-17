@@ -135,12 +135,19 @@ const Contact = () => {
     setStatus(null);
 
     try {
-      const response = await fetch('/api/send-email', {
+      // Use the backend API endpoint
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/public/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message,
+        }),
       });
 
       const result = await response.json();
@@ -148,9 +155,10 @@ const Contact = () => {
         setStatus('Message sent successfully! We will get back to you soon.');
         setFormData({ name: '', email: '', subject: '', message: '' });
       } else {
-        setStatus(result.error || 'Failed to send message. Please try again.');
+        setStatus(result.detail || result.error || 'Failed to send message. Please try again.');
       }
     } catch (error) {
+      console.error('Error sending message:', error);
       setStatus('An error occurred. Please try again later.');
     } finally {
       setIsSubmitting(false);

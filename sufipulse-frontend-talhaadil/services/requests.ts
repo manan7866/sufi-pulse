@@ -153,3 +153,11 @@ export const getApprovedBlogs = (params: { skip?: number; limit?: number; catego
     },
   });
 };
+
+export const getBlogById = (blogId: number) => {
+  return api.get(`/public/blogs/${blogId}`, {
+    headers: {
+      requiresAuth: false,
+    },
+  });
+};

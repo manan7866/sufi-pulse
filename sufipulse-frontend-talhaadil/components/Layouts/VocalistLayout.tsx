@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type React from "react";
-import { User, Music, Menu, X, LogOut, User2, ArrowLeft, Bell, Mail } from "lucide-react";
+import { User, Music, Menu, X, LogOut, User2, ArrowLeft, Bell, Mail, Mic, Wifi } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { checkVocalistRegistration } from "@/services/vocalist";
@@ -58,6 +58,18 @@ const VocalistLayout: React.FC<VocalistLayoutProps> = ({ children }) => {
       href: "/vocalist/kalam",
       icon: Music,
       current: pathname === "/vocalist/kalam",
+    },
+    {
+      name: "Studio Recording",
+      href: "/vocalist/recording-requests/studio",
+      icon: Mic,
+      current: pathname === "/vocalist/recording-requests/studio",
+    },
+    {
+      name: "Remote Recording",
+      href: "/vocalist/recording-requests/remote",
+      icon: Wifi,
+      current: pathname === "/vocalist/recording-requests/remote",
     },
     {
       name: "Blog",
@@ -195,11 +207,18 @@ const VocalistLayout: React.FC<VocalistLayoutProps> = ({ children }) => {
               {/* Heading + Subtext */}
               <div>
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900">
-                  {pathname === "/vocalist/profile" ? "Profile" : "Kalam Management"}
+                  {pathname === "/vocalist/profile" ? "Profile" : 
+                   pathname === "/vocalist/recording-requests/studio" ? "Studio Recording Request" :
+                   pathname === "/vocalist/recording-requests/remote" ? "Remote Recording Request" :
+                   "Kalam Management"}
                 </h2>
                 <p className="hidden sm:flex text-xs sm:text-sm text-slate-600">
                   {pathname === "/vocalist/profile"
                     ? "View your vocalist profile and kalams"
+                    : pathname === "/vocalist/recording-requests/studio"
+                    ? "Request in-person studio sessions for approved lyrics"
+                    : pathname === "/vocalist/recording-requests/remote"
+                    ? "Request remote production for approved lyrics"
                     : "Manage kalam approvals and recording requests"}
                 </p>
               </div>

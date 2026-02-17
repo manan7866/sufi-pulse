@@ -160,9 +160,9 @@ const Navbar = () => {
       name: "Reflections",
       path: "/studio-diaries",
       dropdown: [
-        { name: "Guest Blogs", path: "/guest-blogs" },
-        { name: "Sufi Music Theory", path: "/sufi-music-theory" },
-        { name: "Legacy of Dr. Kumar", path: "/legacy-of-dr-kumar" },
+        { name: "Guest Blogs", path: "/reflection/guest-blogs" },
+        { name: "Sufi Music Theory", path: "/reflection/sufi-music-theory" },
+        { name: "Legacy of Dr. Kumar", path: "/reflection/legacy-of-dr-kumar" },
       ],
     },
     {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { toast } from 'react-hot-toast';
-import { submitBlogPost, getBlogSubmissionById, updateBlogPost } from '@/services/blogger';
+import { submitBlogPost, getBlogSubmissionById, updateBlogPost, uploadBlogImage } from '@/services/blogger';
 import { BookOpen, Globe, Tag, Calendar, Edit, PenTool, Award, Upload } from 'lucide-react';
 
 // Dynamically import the RichTextEditor to avoid SSR issues
@@ -19,6 +19,7 @@ const BlogWritingForm = () => {
     title: '',
     excerpt: '',
     featuredImage: null as File | null,
+    featuredImageUrl: '',
     content: '',
     category: '',
     tags: '',
@@ -30,6 +31,7 @@ const BlogWritingForm = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
   // Load existing blog if editing
@@ -76,15 +78,33 @@ const BlogWritingForm = () => {
     setFormData(prev => ({ ...prev, content }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      // Validate image size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('Image size should be less than 2MB');
+      // Validate image size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size should be less than 5MB');
         return;
       }
-      setFormData(prev => ({ ...prev, featuredImage: file }));
+      
+      // Upload the image
+      setIsUploadingImage(true);
+      try {
+        const response = await uploadBlogImage(file);
+        if (response.data && response.data.url) {
+          setFormData(prev => ({ 
+            ...prev, 
+            featuredImage: file,
+            featuredImageUrl: response.data.url 
+          }));
+          toast.success('Image uploaded successfully!');
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        toast.error('Failed to upload image');
+      } finally {
+        setIsUploadingImage(false);
+      }
     }
   };
 
@@ -97,7 +117,7 @@ const BlogWritingForm = () => {
       const dataToSend = {
         title: formData.title,
         excerpt: formData.excerpt,
-        featured_image_url: formData.featuredImage ? URL.createObjectURL(formData.featuredImage) : undefined,
+        featured_image_url: formData.featuredImageUrl || undefined,
         content: formData.content,
         category: formData.category,
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
@@ -181,6 +201,7 @@ const BlogWritingForm = () => {
                   >
                     <option value="">Select a category</option>
                     <option value="Sufi Poetry">Sufi Poetry</option>
+                    <option value="Sufi Vakh">Sufi Vakh</option>
                     <option value="Sufi History">Sufi History</option>
                     <option value="Sufi Personalities">Sufi Personalities</option>
                     <option value="Sufi Inquiry">Sufi Inquiry</option>
@@ -189,8 +210,10 @@ const BlogWritingForm = () => {
 
                 {/* Tags */}
                 <div>
+                  
                   <label htmlFor="tags" className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-emerald-900" /> Tags
+                    <Tag className="w-4 h-4 text-emerald-900" /> Add Searchable Tags
+                    
                   </label>
                   <input
                     type="text"
@@ -220,6 +243,7 @@ const BlogWritingForm = () => {
                     <option value="">Select a language</option>
                     <option value="English">English</option>
                     <option value="Urdu">Urdu</option>
+                    <option value="Kashmiri">Kashmiri</option>
                     <option value="Arabic">Arabic</option>
                     <option value="Persian">Persian</option>
                     <option value="Turkish">Turkish</option>
@@ -232,7 +256,7 @@ const BlogWritingForm = () => {
             {/* Content Metadata */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-emerald-900" /> Content Metadata
+                <BookOpen className="w-5 h-5 text-emerald-900" /> Content Metadata  Short Summary / Description
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -290,20 +314,26 @@ const BlogWritingForm = () => {
                   1200 × 630 recommended, Used for blog cards and sharing
                 </p>
                 <div className="flex items-center">
-                  <label className="flex flex-col items-center justify-center w-64 h-48 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100">
-                    {formData.featuredImage ? (
-                      <img 
-                        src={URL.createObjectURL(formData.featuredImage)} 
-                        alt="Featured Preview" 
+                  <label className="flex flex-col items-center justify-center w-64 h-48 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 relative">
+                    {isUploadingImage ? (
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <p className="text-xs text-emerald-600 font-medium">Uploading...</p>
+                      </div>
+                    ) : formData.featuredImageUrl ? (
+                      <img
+                        src={formData.featuredImageUrl}
+                        alt="Featured Preview"
                         className="w-full h-full object-cover rounded-lg"
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
                         <Upload className="w-10 h-10 text-slate-400" />
                         <p className="text-xs text-slate-500 mt-2">Click to upload</p>
+                        <p className="text-xs text-slate-400 mt-1">Max 5MB</p>
                       </div>
                     )}
-                    <input 
+                    <input
                       type="file" 
                       accept="image/*" 
                       onChange={handleImageChange} 

@@ -64,3 +64,15 @@ export const updateBlogPost = (blogId: number, data: any) => {
     },
   });
 };
+
+export const uploadBlogImage = (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  return api.post(`/bloggers/upload-image`, formData, {
+    headers: {
+      requiresAuth: true,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};

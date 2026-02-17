@@ -233,7 +233,7 @@ class BloggerQueries:
 
     def fetch_approved_blogs(self, skip: int = 0, limit: int = 6, category: str = None, search: str = None) -> List[dict]:
         query = """
-            SELECT 
+            SELECT
                 bs.*,
                 u.name AS author_name,
                 u.email AS author_email,
@@ -245,21 +245,43 @@ class BloggerQueries:
             LEFT JOIN bloggers b ON bs.user_id = b.user_id
             WHERE bs.status IN ('approved', 'posted')
         """
-        
+
         params = []
-        
+
         if category:
             query += " AND LOWER(bs.category) = LOWER(%s)"
             params.append(category)
-        
+
         if search:
             query += " AND (bs.title ILIKE %s OR bs.excerpt ILIKE %s OR bs.content ILIKE %s)"
             search_param = f"%{search}%"
             params.extend([search_param, search_param, search_param])
-        
+
         query += " ORDER BY bs.created_at DESC OFFSET %s LIMIT %s"
         params.extend([skip, limit])
-        
+
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(query, params)
             return cur.fetchall()
+
+    def fetch_blog_by_id(self, blog_id: int) -> dict:
+        """Fetch a single blog post by ID"""
+        query = """
+            SELECT
+                bs.*,
+                u.name AS author_name,
+                u.email AS author_email,
+                b.author_name AS blogger_name,
+                b.author_image_url,
+                b.short_bio,
+                b.location AS blogger_location,
+                b.website_url AS blogger_website
+            FROM blog_submissions bs
+            JOIN users u ON bs.user_id = u.id
+            LEFT JOIN bloggers b ON bs.user_id = b.user_id
+            WHERE bs.id = %s AND bs.status IN ('approved', 'posted')
+        """
+        
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, (blog_id,))
+            return cur.fetchone()

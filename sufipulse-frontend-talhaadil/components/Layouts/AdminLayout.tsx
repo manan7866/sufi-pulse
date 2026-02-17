@@ -4,7 +4,7 @@ import { useState } from "react";
 import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, Mic, PenTool, BookText, Building, Globe, User2, LogOut, Handshake, Bell, Trophy } from "lucide-react";
+import { Menu, X, LayoutDashboard, Mic, PenTool, BookText, Building, Wifi, User2, LogOut, Handshake, Bell, Trophy } from "lucide-react";
 import { BiLogIn } from "react-icons/bi";
 import Cookies from "js-cookie";
 
@@ -15,17 +15,19 @@ interface AdminLayoutProps {
 
 const menuItems = [
   // { name: "Dashboard", href: "/admin", icon: LayoutDashboard, permissionKey: "dashboard" },
-  { name: "Vocalists", href: "/admin/vocalists", icon: Mic, permissionKey: "vocalist" },
   { name: "Writers", href: "/admin/writers", icon: PenTool, permissionKey: "writer" },
-  { name: "Bloggers", href: "/admin/bloggers", icon: PenTool, permissionKey: "blogger" },
   { name: "Kalams", href: "/admin/kalams", icon: BookText, permissionKey: "kalams" },
-  { name: "Studio Requests", href: "/admin/studio-requests", icon: Building, permissionKey: "requests" },
-  { name: "Remote Requests", href: "/admin/remote-requests", icon: Globe, permissionKey: "requests" },
+  { name: "Vocalists", href: "/admin/vocalists", icon: Mic, permissionKey: "vocalist" },
+  { name: "Studio Requests", href: "/admin/recording-requests/studio", icon: Building, permissionKey: "requests" },
+  { name: "Remote Requests", href: "/admin/recording-requests/remote", icon: Wifi, permissionKey: "requests" },
+  { name: "Bloggers", href: "/admin/bloggers", icon: PenTool, permissionKey: "blogger" },
+  { name: "Blogs", href: "/admin/blogs", icon: BiLogIn, permissionKey: "blog" },
   { name: "Partnership", href: "/admin/partnership", icon: Handshake, permissionKey: "partnership_proposal" },
+  { name: "Special Recognition", href: "/admin/special", icon: Trophy, permissionKey: "recognitions" },
   { name: "Notification", href: "/admin/notifications", icon: Bell, permissionKey: "notification" },
   { name: "Sub Admins", href: "/admin/other-admins", icon: User2, permissionKey: "sub_admins" },
-  { name: "Blogs", href: "/admin/blogs", icon: BiLogIn, permissionKey: "blog" },
-  { name: "Special Recognition", href: "/admin/special", icon: Trophy, permissionKey: "recognitions" }
+  
+  
 ];
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
