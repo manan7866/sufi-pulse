@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getAllRemoteRecordingRequests } from "@/services/requests"
+import { getAllRemoteRecordingRequests, updateRemoteRecordingRequestStatus } from "@/services/requests"
 
 interface RemoteRequest {
   id: number
@@ -21,6 +21,8 @@ interface RemoteRequest {
   recording_experience: string
   technical_setup: string
   additional_details: string
+  status: string
+  admin_comments: string
   created_at: string
   updated_at: string
 }
@@ -31,6 +33,8 @@ export default function RemoteRequestsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [expandedRows, setExpandedRows] = useState<number[]>([])
+  const [updatingId, setUpdatingId] = useState<number | null>(null)
+  const [adminComments, setAdminComments] = useState("")
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -75,6 +79,24 @@ export default function RemoteRequestsPage() {
     setExpandedRows(prev =>
       prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
     )
+  }
+
+  const handleStatusUpdate = async (requestId: number, newStatus: string) => {
+    setUpdatingId(requestId)
+    try {
+      await updateRemoteRecordingRequestStatus(requestId, newStatus, adminComments)
+      // Refresh requests
+      const response = await getAllRemoteRecordingRequests()
+      setRequests(Array.isArray(response.data) ? response.data : [])
+      setFilteredRequests(Array.isArray(response.data) ? response.data : [])
+      setAdminComments("")
+      alert(`Request ${newStatus} successfully!`)
+    } catch (error) {
+      console.error("[v0] Error updating status:", error)
+      alert("Failed to update status. Please try again.")
+    } finally {
+      setUpdatingId(null)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -163,6 +185,38 @@ export default function RemoteRequestsPage() {
             </div>
             {expandedRows.includes(request.id) && (
               <div className="p-4 sm:p-6 border-t border-slate-200 bg-slate-50">
+                {/* Status Update Section */}
+                {request.status === "pending" && (
+                  <div className="mb-6 p-4 bg-white rounded-lg border border-slate-200">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-3">Update Request Status</h3>
+                    <div className="space-y-3">
+                      <textarea
+                        value={adminComments}
+                        onChange={(e) => setAdminComments(e.target.value)}
+                        placeholder="Add admin comments (optional)..."
+                        className="w-full p-2 border border-slate-200 rounded-md text-sm"
+                        rows={2}
+                      />
+                      <div className="flex gap-3 flex-wrap">
+                        <button
+                          onClick={() => handleStatusUpdate(request.id, "approved")}
+                          disabled={updatingId === request.id}
+                          className="bg-emerald-900 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-emerald-800 transition-colors disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleStatusUpdate(request.id, "rejected")}
+                          disabled={updatingId === request.id}
+                          className="bg-red-900 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-red-800 transition-colors disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
                   <div className="space-y-3">
                     <div>

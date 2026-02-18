@@ -1,13 +1,79 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import StatsCard from "@/components/StatsCard"
-import Chart from "@/components/Chart"
+import { 
+  Users, 
+  FileText, 
+  Mic2, 
+  Music, 
+  Radio, 
+  TrendingUp, 
+  Activity,
+  BarChart3,
+  Eye,
+  CheckCircle,
+  Clock,
+  AlertCircle
+} from "lucide-react"
+import Link from "next/link"
 import { getAllVocalists, getAllWriters, getAllBloggers, getAllKalams, getAllBlogSubmissions } from "@/services/admin"
 import { getAllRemoteRecordingRequests, getAllStudioVisitRequests } from "@/services/requests"
+import { getAllStudioRequests, getAllRemoteRequests } from "@/services/adminRecordingRequests"
+
+interface DashboardStats {
+  totalVocalists: number
+  totalWriters: number
+  totalBloggers: number
+  totalKalams: number
+  totalBlogs: number
+  totalStudioRequests: number
+  totalRemoteRequests: number
+  pendingStudioRequests: number
+  pendingRemoteRequests: number
+}
+
+interface StatCardProps {
+  title: string
+  value: number
+  icon: React.ReactNode
+  color: string
+  link: string
+  trend?: {
+    value: number
+    isPositive: boolean
+  }
+}
+
+function ModernStatCard({ title, value, icon, color, link, trend }: StatCardProps) {
+  return (
+    <Link href={link} className="block group">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-lg hover:border-emerald-200 transition-all duration-300 transform hover:-translate-y-1">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-slate-600">{title}</p>
+            <p className="text-4xl font-bold text-slate-900 mt-2 group-hover:text-emerald-700 transition-colors">
+              {value}
+            </p>
+            {trend && (
+              <div className="flex items-center mt-3">
+                <span className={`text-sm font-semibold ${trend.isPositive ? "text-emerald-600" : "text-red-600"}`}>
+                  {trend.isPositive ? "↗" : "↘"} {Math.abs(trend.value)}%
+                </span>
+                <span className="text-xs text-slate-500 ml-2">vs last month</span>
+              </div>
+            )}
+          </div>
+          <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${color}`}>
+            {icon}
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalVocalists: 0,
     totalWriters: 0,
     totalBloggers: 0,
@@ -15,6 +81,8 @@ export default function AdminDashboard() {
     totalBlogs: 0,
     totalStudioRequests: 0,
     totalRemoteRequests: 0,
+    pendingStudioRequests: 0,
+    pendingRemoteRequests: 0,
   })
 
   const [chartData, setChartData] = useState([
@@ -28,13 +96,15 @@ export default function AdminDashboard() {
   ])
 
   const [loading, setLoading] = useState(true)
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [recordingRequests, setRecordingRequests] = useState<{ studio: any[], remote: any[] }>({ studio: [], remote: [] })
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         console.log("[v0] Fetching dashboard data...")
 
-        const [vocalistsRes, writersRes, bloggersRes, kalamsRes, blogsRes, studioRes, remoteRes] = await Promise.all([
+        const [vocalistsRes, writersRes, bloggersRes, kalamsRes, blogsRes, studioRes, remoteRes, studioRecordingRes, remoteRecordingRes] = await Promise.all([
           getAllVocalists(),
           getAllWriters(),
           getAllBloggers(),
@@ -42,6 +112,8 @@ export default function AdminDashboard() {
           getAllBlogSubmissions(),
           getAllStudioVisitRequests(),
           getAllRemoteRecordingRequests(),
+          getAllStudioRequests(),
+          getAllRemoteRequests(),
         ])
 
         console.log("[v0] Vocalists response:", vocalistsRes.data)
@@ -51,6 +123,8 @@ export default function AdminDashboard() {
         console.log("[v0] Blogs response:", blogsRes.data)
         console.log("[v0] Studio requests response:", studioRes.data)
         console.log("[v0] Remote requests response:", remoteRes.data)
+        console.log("[v0] Studio recording requests:", studioRecordingRes.data)
+        console.log("[v0] Remote recording requests:", remoteRecordingRes.data)
 
         const vocalistsCount = vocalistsRes.data?.vocalists?.length || 0
         const writersCount = writersRes.data?.writers?.length || 0
@@ -59,6 +133,14 @@ export default function AdminDashboard() {
         const blogsCount = blogsRes.data?.blogs?.length || 0
         const studioCount = Array.isArray(studioRes.data) ? studioRes.data.length : 0
         const remoteCount = Array.isArray(remoteRes.data) ? remoteRes.data.length : 0
+        
+        // Recording requests (studio & remote)
+        const studioRecordingRequests = studioRecordingRes.data?.requests || []
+        const remoteRecordingRequests = remoteRecordingRes.data?.requests || []
+        const studioRecordingCount = studioRecordingRequests.length
+        const remoteRecordingCount = remoteRecordingRequests.length
+        const pendingStudioCount = studioRecordingRequests.filter((r: any) => r.status === 'pending_review').length
+        const pendingRemoteCount = remoteRecordingRequests.filter((r: any) => r.status === 'under_review').length
 
         setStats({
           totalVocalists: vocalistsCount,
@@ -66,8 +148,10 @@ export default function AdminDashboard() {
           totalBloggers: bloggersCount,
           totalKalams: kalamsCount,
           totalBlogs: blogsCount,
-          totalStudioRequests: studioCount,
-          totalRemoteRequests: remoteCount,
+          totalStudioRequests: studioCount + studioRecordingCount,
+          totalRemoteRequests: remoteCount + remoteRecordingCount,
+          pendingStudioRequests: pendingStudioCount,
+          pendingRemoteRequests: pendingRemoteCount,
         })
 
         setChartData([
@@ -76,8 +160,20 @@ export default function AdminDashboard() {
           { name: "Bloggers", value: bloggersCount },
           { name: "Kalams", value: kalamsCount },
           { name: "Blogs", value: blogsCount },
-          { name: "Studio Req", value: studioCount },
-          { name: "Remote Req", value: remoteCount },
+          { name: "Studio Req", value: studioCount + studioRecordingCount },
+          { name: "Remote Req", value: remoteCount + remoteRecordingCount },
+        ])
+
+        setRecordingRequests({
+          studio: studioRecordingRequests.slice(0, 5),
+          remote: remoteRecordingRequests.slice(0, 5),
+        })
+
+        // Mock recent activity (you can replace with real data)
+        setRecentActivity([
+          { type: "vocalist", action: "New vocalist registered", time: "2 hours ago" },
+          { type: "kalam", action: "New kalam submitted", time: "4 hours ago" },
+          { type: "blog", action: "Blog post pending review", time: "6 hours ago" },
         ])
       } catch (error) {
         console.error("[v0] Error fetching dashboard data:", error)
@@ -90,62 +186,278 @@ export default function AdminDashboard() {
   }, [])
 
   if (loading) {
-      return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-emerald-900 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading Dashboard...</p>
+          <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">Loading Dashboard...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
-        <p className="text-slate-800 mt-2">Overview of your platform statistics</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-slate-100 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-xl flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+                Admin Dashboard
+              </h1>
+              <p className="text-slate-600 mt-2 text-sm sm:text-base">
+                Overview of your platform statistics and activity
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Clock className="w-4 h-4" />
+              <span>Last updated: {new Date().toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-        <StatsCard
-          title="Total Vocalists"
-          value={stats.totalVocalists}
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>}
-          trend={{ value: 12, isPositive: true }}
-        />
-        <StatsCard
-          title="Total Writers"
-          value={stats.totalWriters}
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>}
-          trend={{ value: 8, isPositive: true }}
-        />
-        <StatsCard
-          title="Total Kalams"
-          value={stats.totalKalams}
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-          trend={{ value: 15, isPositive: true }}
-        />
-        <StatsCard
-          title="Studio Requests"
-          value={stats.totalStudioRequests}
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
-          trend={{ value: 5, isPositive: false }}
-        />
-        <StatsCard
-          title="Remote Requests"
-          value={stats.totalRemoteRequests}
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012-2v-1a2 2 0 012-2h2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-          trend={{ value: 20, isPositive: true }}
-        />
-      </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          <ModernStatCard
+            title="Total Vocalists"
+            value={stats.totalVocalists}
+            icon={<Mic2 className="w-8 h-8 text-white" />}
+            color="bg-gradient-to-br from-emerald-500 to-emerald-700"
+            link="/admin/vocalists"
+            trend={{ value: 12, isPositive: true }}
+          />
+          <ModernStatCard
+            title="Total Writers"
+            value={stats.totalWriters}
+            icon={<FileText className="w-8 h-8 text-white" />}
+            color="bg-gradient-to-br from-blue-500 to-blue-700"
+            link="/admin/writers"
+            trend={{ value: 8, isPositive: true }}
+          />
+          <ModernStatCard
+            title="Total Bloggers"
+            value={stats.totalBloggers}
+            icon={<Users className="w-8 h-8 text-white" />}
+            color="bg-gradient-to-br from-purple-500 to-purple-700"
+            link="/admin/bloggers"
+            trend={{ value: 15, isPositive: true }}
+          />
+          <ModernStatCard
+            title="Total Kalams"
+            value={stats.totalKalams}
+            icon={<Music className="w-8 h-8 text-white" />}
+            color="bg-gradient-to-br from-orange-500 to-orange-700"
+            link="/admin/kalams"
+            trend={{ value: 20, isPositive: true }}
+          />
+          <ModernStatCard
+            title="Total Blogs"
+            value={stats.totalBlogs}
+            icon={<Eye className="w-8 h-8 text-white" />}
+            color="bg-gradient-to-br from-pink-500 to-pink-700"
+            link="/admin/blogs"
+            trend={{ value: 10, isPositive: true }}
+          />
+          <ModernStatCard
+            title="Studio Requests"
+            value={stats.totalStudioRequests}
+            icon={<CheckCircle className="w-8 h-8 text-white" />}
+            color="bg-gradient-to-br from-teal-500 to-teal-700"
+            link="/admin/recording-requests/studio"
+            trend={{ value: 5, isPositive: false }}
+          />
+          <ModernStatCard
+            title="Remote Requests"
+            value={stats.totalRemoteRequests}
+            icon={<Radio className="w-8 h-8 text-white" />}
+            color="bg-gradient-to-br from-indigo-500 to-indigo-700"
+            link="/admin/recording-requests/remote"
+            trend={{ value: 18, isPositive: true }}
+          />
+        </div>
 
-      {/* Charts */}
-      
-        <Chart data={chartData} title="Platform Overview" />
-        
+        {/* Charts and Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Chart */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-600" />
+                Platform Overview
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-emerald-600 rounded-full"></span>
+                <span className="text-sm text-slate-600">Active Users</span>
+              </div>
+            </div>
+            <div className="h-64">
+              <canvas id="dashboardChart" className="w-full h-full" />
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-600" />
+                Recent Activity
+              </h2>
+              <Link href="/admin/notifications" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                View All
+              </Link>
+            </div>
+            <div className="space-y-4">
+              {recentActivity.map((activity, index) => (
+                <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                  <div className={`w-2 h-2 rounded-full mt-2 ${
+                    activity.type === 'vocalist' ? 'bg-emerald-500' :
+                    activity.type === 'kalam' ? 'bg-blue-500' :
+                    'bg-orange-500'
+                  }`}></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900">{activity.action}</p>
+                    <p className="text-xs text-slate-500 mt-1">{activity.time}</p>
+                  </div>
+                </div>
+              ))}
+              {recentActivity.length === 0 && (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">No recent activity</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-2xl shadow-lg p-6 sm:p-8 text-white">
+          <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Link href="/admin/cms" className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center transition-all">
+              <FileText className="w-6 h-6 mx-auto mb-2" />
+              <span className="text-sm font-medium">Manage CMS</span>
+            </Link>
+            <Link href="/admin/notifications" className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center transition-all">
+              <Users className="w-6 h-6 mx-auto mb-2" />
+              <span className="text-sm font-medium">Notifications</span>
+            </Link>
+            <Link href="/admin/blog-submissions" className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center transition-all">
+              <CheckCircle className="w-6 h-6 mx-auto mb-2" />
+              <span className="text-sm font-medium">Review Blogs</span>
+            </Link>
+            <Link href="/admin/kalams" className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center transition-all">
+              <Music className="w-6 h-6 mx-auto mb-2" />
+              <span className="text-sm font-medium">Kalams</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Recording Requests Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Studio Recording Requests */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-xl flex items-center justify-center">
+                  <Mic2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Studio Recording Requests</h2>
+                  <p className="text-sm text-slate-600">
+                    {stats.pendingStudioRequests > 0 && (
+                      <span className="text-amber-600 font-semibold">{stats.pendingStudioRequests} pending</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <Link href="/admin/recording-requests/studio" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                View All →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recordingRequests.studio.length > 0 ? (
+                recordingRequests.studio.slice(0, 4).map((request: any) => (
+                  <div key={request.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">{request.lyric_title}</p>
+                      <p className="text-xs text-slate-600">
+                        {new Date(request.preferred_session_date).toLocaleDateString()} • {request.preferred_time_block}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      request.status === 'pending_review' ? 'bg-amber-100 text-amber-700' :
+                      request.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                      request.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {request.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Mic2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">No studio recording requests</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Remote Recording Requests */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center">
+                  <Radio className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Remote Recording Requests</h2>
+                  <p className="text-sm text-slate-600">
+                    {stats.pendingRemoteRequests > 0 && (
+                      <span className="text-amber-600 font-semibold">{stats.pendingRemoteRequests} pending</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <Link href="/admin/recording-requests/remote" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                View All →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recordingRequests.remote.length > 0 ? (
+                recordingRequests.remote.slice(0, 4).map((request: any) => (
+                  <div key={request.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">{request.lyric_title}</p>
+                      <p className="text-xs text-slate-600">
+                        Target: {new Date(request.target_submission_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      request.status === 'under_review' ? 'bg-amber-100 text-amber-700' :
+                      request.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                      request.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {request.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Radio className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">No remote recording requests</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
-} 
+}

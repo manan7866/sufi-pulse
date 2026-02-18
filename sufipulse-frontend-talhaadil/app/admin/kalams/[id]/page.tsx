@@ -63,6 +63,16 @@ export default function KalamDetailsPage() {
   })
   const [vocalistName, setVocalistName] = useState("")
   const [showDropdown, setShowDropdown] = useState(false)
+  const [selectedStatus, setSelectedStatus] = useState("")
+
+  // All possible statuses for kalam submissions
+  const allStatuses = [
+    { value: "pending", label: "Pending", color: "bg-amber-100 text-amber-900" },
+    { value: "under_review", label: "Under Review", color: "bg-blue-100 text-blue-900" },
+    { value: "approved", label: "Approved", color: "bg-emerald-100 text-emerald-900" },
+    { value: "needs_revision", label: "Needs Revision", color: "bg-orange-100 text-orange-900" },
+    { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-900" },
+  ]
 
 
   useEffect(() => {
@@ -116,7 +126,7 @@ export default function KalamDetailsPage() {
 
 
 
-  const handleStatusUpdate = async (newStatus: 'changes_requested' | 'admin_approved' | 'admin_rejected') => {
+  const handleStatusUpdate = async (newStatus: 'pending' | 'under_review' | 'approved' | 'needs_revision' | 'rejected') => {
     if (!kalamDetails) return
     setIsSubmitting(true)
     try {
@@ -127,11 +137,22 @@ export default function KalamDetailsPage() {
       const response = await getKalamDetails(String(params.id))
       setKalamDetails(response.data)
       setAdminComments("")
+      setSelectedStatus("")
+      alert(`Kalam status updated to ${newStatus.replace('_', ' ')} successfully!`)
     } catch (error) {
       console.error("[v0] Error updating status:", error)
+      alert("Failed to update status. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleManualStatusChange = () => {
+    if (!selectedStatus) {
+      alert("Please select a status first")
+      return
+    }
+    handleStatusUpdate(selectedStatus as any)
   }
 
   const handleAssignVocalist = async () => {
@@ -212,45 +233,58 @@ export default function KalamDetailsPage() {
         </button>
       </div>
 
-      {/* Status Actions */}
-      {submission.status === "submitted" && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Review Actions</h2>
-          <div className="space-y-4">
-            <textarea
-              value={adminComments}
-              onChange={(e) => setAdminComments(e.target.value)}
-              placeholder="Add comments for the writer..."
-              className="w-full p-2 border border-slate-200 rounded-md"
-            />
-            <div className="flex gap-4">
-              <button
-                onClick={() => handleStatusUpdate("admin_approved")}
-                disabled={isSubmitting}
-                className="bg-emerald-900 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-emerald-800 transition-colors duration-200 disabled:opacity-50"
-              >
-                Approve Kalam
-              </button>
-              <button
-                onClick={() => handleStatusUpdate("admin_rejected")}
-                disabled={isSubmitting}
-                className="bg-red-900 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-red-800 transition-colors duration-200 disabled:opacity-50"
-              >
-                Reject Kalam
-              </button>
-              <button
-                onClick={() => handleStatusUpdate("changes_requested")}
-                disabled={isSubmitting}
-                className="bg-yellow-900 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-yellow-800 transition-colors duration-200 disabled:opacity-50"
-              >
-                Request Changes
-              </button>
-            </div>
-          </div>
+      {/* Status Display */}
+      {/* <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-slate-900">Current Status</h2>
+          <span
+            className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+              submission.status === "approved"
+                ? " text-green-400"
+                : submission.status === "pending"
+                  ? "bg-amber-100 "
+                  : submission.status === "under_review"
+                    ? "bg-blue-100 text-blue-900"
+                    : submission.status === "needs_revision"
+                      ? "bg-orange-100 text-orange-900"
+                      : "bg-red-100 text-red-900"
+            }`}
+          >
+            {submission.status
+              .split('_')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ')
+            }
+          </span>
         </div>
-      )}
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-slate-600">User Approval:</p>
+            <p className={`font-medium ${
+              submission.user_approval_status === "approved" ? "text-emerald-700" :
+              submission.user_approval_status === "rejected" ? "text-red-700" :
+              "text-amber-700"
+            }`}>
+              {submission.user_approval_status?.charAt(0).toUpperCase() + submission.user_approval_status?.slice(1) || "N/A"}
+            </p>
+          </div>
+          <div>
+            <p className="text-slate-600">Vocalist Approval:</p>
+            <p className={`font-medium ${
+              submission.vocalist_approval_status === "approved" ? "text-emerald-700" :
+              submission.vocalist_approval_status === "rejected" ? "text-red-700" :
+              "text-amber-700"
+            }`}>
+              {submission.vocalist_approval_status?.charAt(0).toUpperCase() + submission.vocalist_approval_status?.slice(1) || "N/A"}
+            </p>
+          </div>
+        </div> */}
+      {/* </div> */} 
 
-      {/* Vocalist Assignment */}
+      {/* Manual Status Change Section - ALWAYS VISIBLE */}
+      
+
+      {/* Status Actions for admin_approved (final_approved) */}
       {submission.status === "final_approved" && submission.vocalist_approval_status !== "approved" && (
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Assign Vocalist</h2>
@@ -396,8 +430,8 @@ export default function KalamDetailsPage() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-800">Overall Status</label>
-              <span
-                className={`inline-block px-2 py-1 rounded-md text-sm font-medium ml-2 ${submission.status === "final_approved" || submission.status === "complete_approved" || submission.status === "posted"
+              <span                                                                                  
+                className={`inline-block px-2 py-1 rounded-md text-sm font-medium ml-2 ${submission.status === "approved" || submission.status === "under_review" || submission.status === "posted"
                   ? "bg-emerald-50 text-emerald-900"
                   : submission.status === "pending" || submission.status === "submitted"
                     ? "bg-yellow-50 text-yellow-800"
@@ -416,7 +450,7 @@ export default function KalamDetailsPage() {
             </div>
             {submission.status === "changes_requested" && (
               <div>
-                <label className="text-sm font-medium text-slate-800">Writer Approval</label>
+                <label className="text-sm font-medium text-slate-800">Writer Approval </label>
                 <span
                   className={`inline-block px-2 py-1 rounded-md text-sm font-medium ml-2 ${submission.user_approval_status === "approved"
                     ? "bg-emerald-50 text-emerald-900"
@@ -506,6 +540,73 @@ export default function KalamDetailsPage() {
             <label className="text-sm font-medium text-slate-800">Submission Updated</label>
             <p className="text-slate-900">{new Date(submission.updated_at).toLocaleString()}</p>
           </div>
+        </div>
+      </div>
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-sm border border-blue-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Change Kalam Status</h2>
+            <p className="text-sm text-slate-600">Select any status to update this kalam submission</p>
+          </div>
+        </div>
+        
+        <div className="space-y-4">
+          {/* Status Dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Select New Status
+            </label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">-- Choose a status --</option>
+              {allStatuses.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            {selectedStatus && (
+              <div className="mt-2">
+                <p className="text-sm text-slate-600">
+                  Current: <span className="font-medium">{submission.status.replace('_', ' ')}</span>
+                </p>
+                <p className="text-sm text-blue-700">
+                  Changing to: <span className="font-bold">{selectedStatus.replace('_', ' ')}</span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Admin Comments */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Admin Comments (Optional but recommended)
+            </label>
+            <textarea
+              value={adminComments}
+              onChange={(e) => setAdminComments(e.target.value)}
+              placeholder="Add comments explaining this status change..."
+              className="w-full p-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={3}
+            />
+          </div>
+
+          {/* Update Button */}
+          <button
+            onClick={handleManualStatusChange}
+            disabled={!selectedStatus || isSubmitting}
+            className="w-full bg-blue-600 text-white py-3 px-6 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? "Updating..." : "Update Status"}
+          </button>
         </div>
       </div>
     </div>

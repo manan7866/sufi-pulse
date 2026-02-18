@@ -90,6 +90,28 @@ export const getAllRemoteRecordingRequests = () => {
   });
 };
 
+export const updateStudioVisitRequestStatus = (requestId: number, status: string, adminComments?: string) => {
+  return api.put(`/requests/studio-visit-requests/${requestId}/status`, 
+    { status, admin_comments: adminComments },
+    {
+      headers: {
+        requiresAuth: true,
+      },
+    }
+  );
+};
+
+export const updateRemoteRecordingRequestStatus = (requestId: number, status: string, adminComments?: string) => {
+  return api.put(`/requests/remote-recording-requests/${requestId}/status`, 
+    { status, admin_comments: adminComments },
+    {
+      headers: {
+        requiresAuth: true,
+      },
+    }
+  );
+};
+
 
 export const createPartnershipProposal = (data: {
   full_name: string;

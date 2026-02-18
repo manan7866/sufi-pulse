@@ -1,6 +1,6 @@
 "use client"
 
-import { getAllVocalists, getAllWriters } from "@/services/admin"
+import { getAllVocalists, getAllWriters, getAllBloggers } from "@/services/admin"
 import { createNotification } from "@/services/notifications"
 import type React from "react"
 import { useState, useEffect } from "react"
@@ -15,7 +15,7 @@ interface User {
 interface NotificationData {
   title: string
   message: string
-  target_type: "all" | "vocalists" | "writers" | "specific"
+  target_type: "all" | "vocalists" | "writers" | "bloggers" | "specific"
   target_user_ids: number[]
 }
 
@@ -34,26 +34,32 @@ export default function Home() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Fetch users (vocalists and writers) from API
+  // Fetch users (vocalists, writers, and bloggers) from API
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const [vocalistsResponse, writersResponse] = await Promise.all([
+        const [vocalistsResponse, writersResponse, bloggersResponse] = await Promise.all([
           getAllVocalists(),
           getAllWriters(),
+          getAllBloggers(),
         ])
-  
+
         const vocalists = (vocalistsResponse.data?.vocalists || []).map((v: any) => ({
           ...v,
           role: "vocalist",
         }))
-  
+
         const writers = (writersResponse.data?.writers || []).map((w: any) => ({
           ...w,
           role: "writer",
         }))
-  
-        const allUsers = [...vocalists, ...writers]
+
+        const bloggers = (bloggersResponse.data?.bloggers || []).map((b: any) => ({
+          ...b,
+          role: "blogger",
+        }))
+
+        const allUsers = [...vocalists, ...writers, ...bloggers]
         setUsers(allUsers)
         setFilteredUsers(allUsers)
         console.log(allUsers)
@@ -62,7 +68,7 @@ export default function Home() {
         console.error("Failed to fetch users:", error)
       }
     }
-  
+
     fetchUsers()
   }, [])
   
@@ -80,7 +86,7 @@ export default function Home() {
     }
   }, [searchTerm, users])
 
-  const handleTargetTypeChange = (targetType: "all" | "vocalists" | "writers" | "specific") => {
+  const handleTargetTypeChange = (targetType: "all" | "vocalists" | "writers" | "bloggers" | "specific") => {
     if (targetType === "specific") {
       setFormData((prev) => ({ ...prev, target_type: "all", target_user_ids: [] }))
       setShowUserSearch(true)
@@ -198,6 +204,17 @@ export default function Home() {
                     className="mr-2 text-emerald-900 focus:ring-emerald-900"
                   />
                   <span className="text-slate-900">Writers Only</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="targetType"
+                    value="BLOGGERS"
+                    checked={formData.target_type === "bloggers"}
+                    onChange={() => handleTargetTypeChange("bloggers")}
+                    className="mr-2 text-emerald-900 focus:ring-emerald-900"
+                  />
+                  <span className="text-slate-900">Bloggers Only</span>
                 </label>
                 <label className="flex items-center">
                   <input
