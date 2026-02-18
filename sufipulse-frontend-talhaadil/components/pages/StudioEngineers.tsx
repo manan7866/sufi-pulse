@@ -15,6 +15,10 @@ import {
   BookOpen
 } from 'lucide-react';
 import { incrementMonthly, incrementWeekly, incrementYearly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
+
+
 
 const StudioEngineers = () => {
   const engineers = [
@@ -104,8 +108,34 @@ const StudioEngineers = () => {
       languages: ["English", "Urdu", "Hindi", "Arabic"]
     }
   ];
+// These  fields data comming from database cms
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'studio-engineers',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
 
-  const stats = [
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    icon: (() => {
+      switch (stat.stat_icon) {
+        case 'Users':
+          return Users;
+        case 'Music':
+          return Music;
+        case 'Globe':
+          return Globe;
+        case 'Award':
+          return Award;
+        default:
+          return Star; // Default icon if no match
+      }
+    })()
+  }))
+  :  [
     { number: "6", label: "Expert Engineers", icon: Users },
     { number: `${incrementWeekly(300)}+`, label: "Productions", icon: Music },
     { number: `${incrementMonthly(17, 50)}+`, label: "Languages", icon: Globe },

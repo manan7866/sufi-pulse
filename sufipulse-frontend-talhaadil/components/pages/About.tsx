@@ -1,6 +1,10 @@
+"use client";
+
 import React from 'react';
 import Link from 'next/link';
 import { Heart, Globe, Users, Award, BookOpen, Star, ArrowRight, Shield, Zap, Target } from 'lucide-react';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 const About = () => {
   const values = [
@@ -79,7 +83,21 @@ const About = () => {
     }
   ];
 
-  const impactStats = [
+  const { data: cmsData } = useCMSPage({
+    pageSlug: 'about',
+    fallbackData: aboutPageFallbackData,
+    enabled: true
+  });
+const pageData = cmsData || aboutPageFallbackData;
+
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    description: stat.stat_description,
+    
+  }))
+ :  [
     { number: "300+", label: "Sacred Collaborations", description: "Divine kalam brought to life" },
     { number: "89", label: "Writers", description: "From 50+ countries" },
     { number: "43", label: "Vocalists", description: "Diverse spiritual voices" },
@@ -211,7 +229,7 @@ const About = () => {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {impactStats.map((stat, index) => (
+            {stats.map((stat, index) => (
               <div key={index} className="bg-white rounded-xl p-6 shadow-lg border border-slate-100 text-center hover:shadow-xl transition-all duration-300">
                 <div className="text-3xl font-bold text-emerald-600 mb-2">{stat.number}</div>
                 <div className="text-sm font-medium text-slate-800 mb-1">{stat.label}</div>

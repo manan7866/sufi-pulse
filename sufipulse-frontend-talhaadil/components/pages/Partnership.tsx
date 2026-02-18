@@ -20,6 +20,8 @@ import {
 import { createPartnershipProposal } from '@/services/requests';
 import { useToast } from '@/context/ToastContext';
 import { incrementDaily, incrementMonthly, incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 const Partnership = () => {
   const { showToast } = useToast();
@@ -113,26 +115,53 @@ const Partnership = () => {
       setLoading(false);
     }
   };
+// These  fields data comming from database cms
 
-  const stats = [
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'partnership',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
+
+const stats = (pageData.stats && pageData.stats.length > 0)
+  ? pageData.stats.map((stat: any) => ({
+      number: stat.stat_number,
+      label: stat.stat_label,
+      icon: (() => {
+        switch (stat.icon_name) {
+          case 'Globe': return Globe;
+          case 'Users': return Users;
+          case 'BookOpen': return BookOpen;
+          case 'Award': return Award;
+          case 'CheckCircle': return CheckCircle;
+          case 'ArrowRight': return ArrowRight;
+          case 'Star': return Star;
+          case 'Heart': return Heart;
+          case 'Target': return Target;
+          default: return Globe; // Default icon if not matched
+        }
+      })()
+    }))
+  : [
     { number: `${incrementMonthly(15,1000)}+`, label: "Global Partners", icon: Globe },
     { number: `${incrementMonthly(43,200)}+`, label: "Countries Connected", icon: Users },
     { number: `${incrementMonthly(17,50)}+`, label: "Languages Served", icon: BookOpen },
     { number: "100%", label: "Sacred Focus", icon: Award }
   ];
 
-  const organizationTypes = [
-    'Spiritual/Religious Organization',
-    'Educational Institution',
-    'Cultural Center',
-    'Music/Arts Organization',
-    'Research Institution',
-    'Media Company',
-    'Non-Profit Foundation',
-    'Government Agency',
-    'Technology Company',
-    'Other'
-  ];
+const organizationTypes = [
+  'Spiritual/Religious Organization',
+  'Educational Institution',
+  'Cultural Center',
+  'Music/Arts Organization',
+  'Research Institution',
+  'Media Company',
+  'Non-Profit Foundation',
+  'Government Agency',
+  'Technology Company',
+  'Other'
+];
 
   const partnershipTypes = [
     'Content Collaboration',

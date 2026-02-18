@@ -14,6 +14,8 @@ import {
   Music,
   Sparkles
 } from 'lucide-react';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { contactPageFallbackData } from '@/lib/cmsFallbackData';
 
 const Contact = () => {
   const [activeForm, setActiveForm] = useState('general');
@@ -25,6 +27,15 @@ const Contact = () => {
   });
   const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch CMS data with fallback
+  const { data: cmsData } = useCMSPage({
+    pageSlug: 'contact',
+    fallbackData: contactPageFallbackData,
+    enabled: true
+  });
+
+  const pageData = cmsData || contactPageFallbackData;
 
   const contactTypes = [
     {
@@ -68,7 +79,7 @@ const Contact = () => {
   const contactInfo = [
     {
       icon: Mail,
-      title: 'Email Us',
+      title: 'Email Us ',
       details: 'connect@sufipulse.com',
       description: 'Primary contact for all inquiries'
     },
@@ -86,32 +97,40 @@ const Contact = () => {
     }
   ];
 
-  const globalHubs = [
-    {
-      icon: MapPin,
-      title: 'Global Creative Hub',
-      details: 'SufiPulse Studio, Virginia, USA',
-      description: 'Our main creative center'
-    },
-    {
-      icon: MapPin,
-      title: 'Spiritual Heritage Hub',
-      details: 'SufiPulse – Kashmir, Srinagar, Jammu & Kashmir, India',
-      description: 'Rooted in spiritual tradition'
-    },
-    {
-      icon: Music,
-      title: 'Remote Vocalist Recording Hubs',
-      details: 'Srinagar, Kashmir – India\nDubai – UAE\nMumbai – India\nIstanbul – Turkey',
-      description: 'Global recording facilities'
-    },
-    {
-      icon: Mail,
-      title: 'Email Us',
-      details: 'connect@sufipulse.com',
-      description: 'Connect with us globally'
-    }
-  ];
+// These fields data coming from database cms
+  const globalHubs = (pageData.hubs && pageData.hubs.length > 0)
+    ? pageData.hubs.map((hub: any) => ({
+        icon: hub.hub_icon === 'MapPin' ? MapPin : hub.hub_icon === 'Music' ? Music : Mail,
+        title: hub.hub_title,
+        details: hub.hub_details,
+        description: hub.hub_description
+      }))
+    : [
+        {
+          icon: MapPin,
+          title: 'Global Creative Hub',
+          details: 'SufiPulse Studio, Virginia, USA',
+          description: 'Our main creative center'
+        },
+        {
+          icon: MapPin,
+          title: 'Spiritual Heritage Hub',
+          details: 'SufiPulse – Kashmir, Srinagar, Jammu & Kashmir, India',
+          description: 'Rooted in spiritual tradition'
+        },
+        {
+          icon: Music,
+          title: 'Remote Vocalist Recording Hubs',
+          details: 'Srinagar, Kashmir – India\nDubai – UAE\nMumbai – India\nIstanbul – Turkey',
+          description: 'Global recording facilities'
+        },
+        {
+          icon: Mail,
+          title: 'Email Us',
+          details: 'connect@sufipulse.com',
+          description: 'Connect with us globally'
+        }
+      ];
 
   const socialLinks = [
     { name: 'YouTube', href: '#', color: 'text-red-600 hover:text-red-700' },
@@ -310,7 +329,7 @@ const Contact = () => {
                     <div key={index} className="flex items-start space-x-4">
                       <hub.icon className="w-8 h-8 text-emerald-500 flex-shrink-0" />
                       <div>
-                        <h4 className="font-bold text-slate-800">{hub.title}</h4>
+                        <h4 className="font-bold text-slate-800">{hub.title }</h4>
                         <p className="text-slate-600 whitespace-pre-line">{hub.details}</p>
                         <p className="text-sm text-slate-500">{hub.description}</p>
                       </div>

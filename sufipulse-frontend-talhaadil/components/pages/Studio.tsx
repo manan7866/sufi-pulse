@@ -6,6 +6,11 @@ import { Mic, Headphones, Music, Users, Award, MapPin, Calendar, Clock, Star, Sh
 import { incrementWeekly, incrementMonthly } from '@/lib/increment';
 import Cookies from 'js-cookie';
 import { useToast } from '@/context/ToastContext';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
+
+
+
 
 const Studio = () => {
   const { showToast } = useToast();
@@ -208,6 +213,42 @@ const Studio = () => {
     }
   ];
 
+
+  // These  fields data comming from database cms
+
+  const { data: cmsData } = useCMSPage({
+    pageSlug: 'studio',
+    fallbackData: aboutPageFallbackData,
+    enabled: true
+  });
+  const pageData = cmsData || aboutPageFallbackData;
+
+  const stats =  (pageData.stats && pageData.stats.length > 0)
+     ? pageData.stats.map((stat: any) => ({
+         number: stat.stat_number,
+         label: stat.stat_label,
+          icon: (() => {
+            switch (stat.stat_icon) {
+              case "Music":
+                return Music;
+              case "Users":
+                return Users;
+              case "Globe":
+                return Globe;
+              case "Award":
+                return Award;
+              default:
+                return Star; // Default icon if none match
+            }
+          })()
+       }))
+     : [
+          { number: incrementWeekly(300), label: "Recordings Made",  icon: Music },
+          { number: 6, label: "Expert Engineers",  icon: Users },
+          { number: incrementMonthly(17, 50), label: "Languages Recorded",  icon: Globe },
+          { number: "100%", label: "Sacred Focus",  icon: Award }
+     ]
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
@@ -241,37 +282,19 @@ const Studio = () => {
       </section>
 
       {/* Stats Section */}
+      {/*  These  fields data comming from database cms */}
       <section className="py-12 sm:py-16 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            <div className="text-center">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Music className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600" />
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <stat.icon className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600" />
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">{stat.number}</div>
+                <div className="text-sm sm:text-base text-slate-600 font-medium">{stat.label}</div>
               </div>
-              <div className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">{incrementWeekly(300)}+</div>
-              <div className="text-sm sm:text-base text-slate-600 font-medium">Recordings Made</div>
-            </div>
-            <div className="text-center">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">6</div>
-              <div className="text-sm sm:text-base text-slate-600 font-medium">Expert Engineers</div>
-            </div>
-            <div className="text-center">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Globe className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">{incrementMonthly(17, 50)}+</div>
-              <div className="text-sm sm:text-base text-slate-600 font-medium">Languages Recorded</div>
-            </div>
-            <div className="text-center">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">100%</div>
-              <div className="text-sm sm:text-base text-slate-600 font-medium">Sacred Focus</div>
-            </div>
+            ))}
           </div>
         </div>
       </section>

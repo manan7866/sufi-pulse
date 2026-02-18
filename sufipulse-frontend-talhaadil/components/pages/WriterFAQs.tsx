@@ -16,6 +16,8 @@ import {
   PenTool
 } from 'lucide-react';
 import { incrementWeekly, incrementMonthly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 const WriterFAQs = () => {
   const [openFAQ, setOpenFAQ] = useState<number | null>(0);
@@ -135,8 +137,26 @@ const WriterFAQs = () => {
       image: "https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=200"
     }
   ];
+// These  fields data comming from database cms
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'writer-faqs',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
 
-  const stats = [
+
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    icon: stat.stat_icon === 'Users' ? Users :
+          stat.stat_icon === 'BookOpen' ? BookOpen :
+          stat.stat_icon === 'Globe' ? Globe :
+          stat.stat_icon === 'Award' ? Award :
+          Users // default icon
+  }))
+:  [
     { number: `${incrementWeekly(89)}+`, label: "Active Writers", icon: Users },
     { number: `${incrementWeekly(300)}+`, label: "Kalam Published", icon: BookOpen },
     { number: `${incrementMonthly(17,50)}+`, label: "Languages", icon: Globe },

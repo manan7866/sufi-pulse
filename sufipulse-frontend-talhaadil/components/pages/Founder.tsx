@@ -1,22 +1,76 @@
+'use client';
+
 import React from 'react';
 import { PenTool, Mic, Music, Globe, BookOpen, Heart, Users, Satellite, Leaf, Shield, Code, Building, Star, MapPin, Sparkles, Quote } from 'lucide-react';
 import { incrementMonthly,incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { founderPageFallbackData } from '@/lib/cmsFallbackData';
+
 const Founder = () => {
-  const roles = [
-    { icon: PenTool, title: "Writer", description: "Crafting sacred Sufi poetry with deep spiritual insight" },
-    { icon: Music, title: "Lyricist", description: "Creating divine verses that resonate with the soul" },
-    { icon: Mic, title: "Composer", description: "Harmonizing words with melodies for spiritual elevation" },
-    { icon: Users, title: "Creative Director", description: "Guiding SufiPulse's artistic vision and mission" }
-  ];
 
-  const expertise = [
-    { icon: Satellite, title: "Remote Sensing Interpreter", field: "Geospatial Analysis" },
-    { icon: Leaf, title: "Environmental Scientist", field: "Ecological Research" },
-    { icon: Shield, title: "Emergency Planner", field: "Crisis Management" },
-    { icon: Code, title: "SaaS Developer", field: "Technology Solutions" },
-    { icon: Building, title: "Entrepreneur", field: "Business Innovation" }
-  ];
+  // Fetch CMS data with fallback
+  const { data: cmsData } = useCMSPage({
+    pageSlug: 'founder',
+    fallbackData: founderPageFallbackData,
+    enabled: true
+  });
 
+  const pageData = cmsData || founderPageFallbackData;
+
+  // Helper to get icon component
+  const getIconComponent = (iconName: string | null | undefined, defaultIcon: any) => {
+    const iconMap: Record<string, any> = {
+      'PenTool': PenTool,
+      'Music': Music,
+      'Mic': Mic,
+      'Users': Users,
+      'Satellite': Satellite,
+      'Leaf': Leaf,
+      'Shield': Shield,
+      'Code': Code,
+      'Building': Building,
+      'MapPin': MapPin,
+      'Sparkles': Sparkles,
+      'Globe': Globe,
+      'Quote': Quote,
+      'Heart': Heart,
+      'Star': Star,
+    };
+    return iconName && iconMap[iconName] ? iconMap[iconName] : defaultIcon;
+  };
+
+  // These fields data coming from database cms - Roles (from sections)
+  const rolesSection = pageData.sections?.find((s: any) => s.section_name === 'Creative Roles');
+  const roles = (rolesSection && rolesSection.items && rolesSection.items.length > 0)
+    ? rolesSection.items.map((item: any) => ({
+        icon: getIconComponent(item.item_icon, PenTool),
+        title: item.item_title,
+        description: item.item_description
+      }))
+    : [
+        { icon: PenTool, title: "Writer", description: "Crafting sacred Sufi poetry with deep spiritual insight" },
+        { icon: Music, title: "Lyricist", description: "Creating divine verses that resonate with the soul" },
+        { icon: Mic, title: "Composer", description: "Harmonizing words with melodies for spiritual elevation" },
+        { icon: Users, title: "Creative Director", description: "Guiding SufiPulse's artistic vision and mission" }
+      ];
+
+  // These fields data coming from database cms - Expertise (from sections)
+  const expertiseSection = pageData.sections?.find((s: any) => s.section_name === 'Professional Expertise');
+  const expertise = (expertiseSection && expertiseSection.items && expertiseSection.items.length > 0)
+    ? expertiseSection.items.map((item: any) => ({
+        icon: getIconComponent(item.item_icon, Satellite),
+        title: item.item_title,
+        field: item.item_field || item.item_subtitle
+      }))
+    : [
+        { icon: Satellite, title: "Remote Sensing Interpreter", field: "Geospatial Analysis" },
+        { icon: Leaf, title: "Environmental Scientist", field: "Ecological Research" },
+        { icon: Shield, title: "Emergency Planner", field: "Crisis Management" },
+        { icon: Code, title: "SaaS Developer", field: "Technology Solutions" },
+        { icon: Building, title: "Entrepreneur", field: "Business Innovation" }
+      ];
+
+  // These fields data coming from database cms - Achievements (placeholder - not in schema yet)
   const achievements = [
     {
       category: "Spiritual Leadership",
@@ -47,41 +101,49 @@ const Founder = () => {
     }
   ];
 
+  // These fields data coming from database cms - Personal Journey (placeholder)
   const personalJourney = [
     {
       phase: "Kashmiri Roots",
       description: "Born into the mystical tradition of Kashmir's sacred valleys, inheriting centuries of Sufi wisdom",
-      icon: MapPin // Replaced emoji with MapPin for location-based heritage
+      icon: MapPin
     },
     {
       phase: "American Innovation",
       description: "Embracing American technological innovation and entrepreneurial spirit",
-      icon: Sparkles // Replaced emoji with Sparkles for innovation
+      icon: Sparkles
     },
     {
       phase: "Global Vision",
       description: "Synthesizing Eastern spirituality with Western innovation to serve the global ummah",
-      icon: Globe // Already using Globe, fits perfectly
+      icon: Globe
     }
   ];
 
-  const quotes = [
-    {
-      text: "We don't sell divine lyrics. We amplify them.",
-      context: "Core Philosophy",
-      icon: Quote // Added Quote icon for quotes
-    },
-    {
-      text: "Technology should serve the sacred, not the other way around.",
-      context: "On Innovation",
-      icon: Quote
-    },
-    {
-      text: "From Kashmir's valleys to the world's heart - every soul deserves to hear the divine pulse.",
-      context: "Mission Statement",
-      icon: Quote
-    }
-  ];
+  // These fields data coming from database cms - Quotes (from testimonials)
+  const quotes = (pageData.testimonials && pageData.testimonials.length > 0)
+    ? pageData.testimonials.map((t: any) => ({
+        text: t.testimonial_quote,
+        context: t.testimonial_role,
+        icon: Quote
+      }))
+    : [
+        {
+          text: "We don't sell divine lyrics. We amplify them.",
+          context: "Core Philosophy",
+          icon: Quote
+        },
+        {
+          text: "Technology should serve the sacred, not the other way around.",
+          context: "On Innovation",
+          icon: Quote
+        },
+        {
+          text: "From Kashmir's valleys to the world's heart - every soul deserves to hear the divine pulse.",
+          context: "Mission Statement",
+          icon: Quote
+        }
+      ];
 
   return (
     <div className="min-h-screen bg-slate-50 py-8">
@@ -105,6 +167,7 @@ const Founder = () => {
           <p className="text-xl text-slate-600 max-w-3xl mx-auto mb-6">
             Founder & Visionary of SufiPulse - Bridging the sacred valleys of Kashmir with the global spiritual community
           </p>
+          {/* // These  fields data comming from database cms  */}
           <div className="flex flex-wrap justify-center gap-2 text-sm">
             <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">Writer</span>
             <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">Lyricist</span>
@@ -115,6 +178,7 @@ const Founder = () => {
         </div>
 
         {/* Hero Section */}
+        
         <section className="mb-20">
           <div className="bg-slate-800 rounded-2xl p-8 lg:p-12 text-white">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from api import auth_router,user_router,admin_router,vocalist_router,kalam_router,studio_router,notification_router,public_router,writer_router,blogger_router,youtube_router,recording_requests_router
+from api import auth_router,user_router,admin_router,vocalist_router,kalam_router,studio_router,notification_router,public_router,writer_router,blogger_router,youtube_router,recording_requests_router,cms_router
 import os
 
 app = FastAPI(title="My App")
@@ -32,3 +32,4 @@ app.include_router(writer_router)
 app.include_router(blogger_router)
 app.include_router(youtube_router)
 app.include_router(recording_requests_router)
+app.include_router(cms_router)

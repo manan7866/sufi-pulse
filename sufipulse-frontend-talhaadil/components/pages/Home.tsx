@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import PromoteProtectSufiKalam from '../PromoteProtectSufiKalam';
 import { incrementWeekly, incrementMonthly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { homePageFallbackData } from '@/lib/cmsFallbackData';
 
 const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
 const CHANNEL_ID = "UCraDr3i5A3k0j7typ6tOOsQ";
@@ -73,6 +75,16 @@ const Home = () => {
   const [error, setError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Fetch CMS data with fallback
+  const { data: cmsData, loading: cmsLoading } = useCMSPage({
+    pageSlug: 'home',
+    fallbackData: homePageFallbackData,
+    enabled: true
+  });
+
+  // Use CMS data or fallback
+  const pageData = cmsData || homePageFallbackData;
+
   const fetchYouTubeVideos = async () => {
     try {
       setLoading(true);
@@ -97,11 +109,12 @@ const Home = () => {
   useEffect(() => {
     if (isPaused) return;
     const interval = setInterval(() => {
-      setActiveTestimonial((prev) => (prev + 1) % testimonials.length);
+      setActiveTestimonial((prev) => (prev + 1) % (pageData.testimonials?.length || 1));
     }, 5000);
     return () => clearInterval(interval);
-  }, [isPaused]);
+  }, [isPaused, pageData.testimonials]);
 
+  // Map CMS testimonials to format expected by UI
   const testimonials = [
     {
       name: "Amina Rahman",
@@ -273,12 +286,36 @@ const Home = () => {
     },
   ];
 
-  const stats = [
-    { number: `${incrementWeekly(300)}+`, label: "Sacred Collaborations", icon: Heart },
-    { number: `${incrementMonthly(43, 200)}+`, label: "Countries Represented", icon: Globe },
-    { number: `${incrementWeekly(150)}+`, label: "Divine Kalam Created", icon: Music },
-    { number: "100%", label: "Free for Writers", icon: Award }
-  ];
+  // Get icon component from icon name
+  const getIconComponent = (iconName: string | null | undefined, defaultIcon: any) => {
+    const iconMap: Record<string, any> = {
+      'Heart': Heart,
+      'Globe': Globe,
+      'Music': Music,
+      'Award': Award,
+      'Users': Users,
+      'BookOpen': BookOpen,
+      'Star': Star,
+      'Play': Play,
+      'PenTool': PenTool,
+      'Mic': Mic,
+    };
+    return iconName && iconMap[iconName] ? iconMap[iconName] : defaultIcon;
+  };
+
+  // These fields data coming from database cms
+  const stats = (pageData.stats && pageData.stats.length > 0)
+    ? pageData.stats.map((stat: any) => ({
+        number: stat.stat_number,
+        label: stat.stat_label,
+        icon: getIconComponent(stat.stat_icon, Heart)
+      }))
+    : [
+        { number: `${incrementWeekly(300)}+`, label: "Sacred Collaborations", icon: Heart },
+        { number: `${incrementMonthly(43, 200)}+`, label: "Countries Represented", icon: Globe },
+        { number: `${incrementWeekly(150)}+`, label: "Divine Kalam Created", icon: Music },
+        { number: "100%", label: "Free for Writers", icon: Award }
+      ];
 
   const handleVideoClick = (videoId: string) => {
     window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");

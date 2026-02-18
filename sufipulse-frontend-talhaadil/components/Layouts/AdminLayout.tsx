@@ -4,7 +4,7 @@ import { useState } from "react";
 import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, Mic, PenTool, BookText, Building, Wifi, User2, LogOut, Handshake, Bell, Trophy } from "lucide-react";
+import { Menu, X, LayoutDashboard, Mic, PenTool, BookText, Building, Wifi, User2, LogOut, Handshake, Bell, Trophy, FileText } from "lucide-react";
 import { BiLogIn } from "react-icons/bi";
 import Cookies from "js-cookie";
 
@@ -14,7 +14,7 @@ interface AdminLayoutProps {
 
 
 const menuItems = [
-  // { name: "Dashboard", href: "/admin", icon: LayoutDashboard, permissionKey: "dashboard" },
+  { name: "Overview", href: "/admin", icon: LayoutDashboard, permissionKey: "dashboard" },
   { name: "Writers", href: "/admin/writers", icon: PenTool, permissionKey: "writer" },
   { name: "Kalams", href: "/admin/kalams", icon: BookText, permissionKey: "kalams" },
   { name: "Vocalists", href: "/admin/vocalists", icon: Mic, permissionKey: "vocalist" },
@@ -26,8 +26,9 @@ const menuItems = [
   { name: "Special Recognition", href: "/admin/special", icon: Trophy, permissionKey: "recognitions" },
   { name: "Notification", href: "/admin/notifications", icon: Bell, permissionKey: "notification" },
   { name: "Sub Admins", href: "/admin/other-admins", icon: User2, permissionKey: "sub_admins" },
-  
-  
+  { name: "CMS Pages", href: "/admin/cms", icon: FileText, permissionKey: "cms" },
+
+
 ];
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {

@@ -20,6 +20,8 @@ import {
   Play
 } from 'lucide-react';
 import { incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 const HowItWorks = () => {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
@@ -47,8 +49,32 @@ const HowItWorks = () => {
       details: ["Dashboard submission", "Theme selection", "Style preferences", "Optional audio"]
     }
   ];
+// These  fields data comming from database cms
 
-  const stats = [
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'how-it-works',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
+
+
+
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    icon: (() => {
+      switch (stat.icon_name) {
+        case 'CheckCircle': return CheckCircle;
+        case 'Clock': return Clock;
+        case 'Award': return Award;
+        case 'Heart': return Heart;
+        default: return Star; // Default icon if no match
+      }
+    })()
+  }))
+: [
     { number: "8", label: "Simple Steps", icon: CheckCircle },
     { number: "4-8", label: "Weeks Timeline", icon: Clock },
     { number: "100%", label: "Free Service", icon: Award },

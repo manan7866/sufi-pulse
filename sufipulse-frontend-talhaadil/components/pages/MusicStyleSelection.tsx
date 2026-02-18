@@ -18,6 +18,8 @@ import {
   Headphones
 } from 'lucide-react';
 import { incrementMonthly,incrementYearly ,incrementWeekly} from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 const MusicStyleSelection = () => {
   const [activeStyle, setActiveStyle] = useState('qawwali');
@@ -147,8 +149,51 @@ const MusicStyleSelection = () => {
       icon: Music
     }
   ];
+// These  fields data comming from database cms
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'music-style-selection',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
 
-  const stats = [
+
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    icon: (() => {
+      switch (stat.stat_icon) {
+        case 'Music':
+          return Music;
+        case 'Heart':
+          return Heart;
+        case 'Volume2':
+          return Volume2;
+        case 'Waves':
+          return Waves;
+        case 'Mic':
+          return Mic;
+        case 'Users':
+          return Users;
+        case 'ArrowRight':
+          return ArrowRight;
+        case 'CheckCircle':
+          return CheckCircle;
+        case 'Globe':
+          return Globe;
+        case 'Star':
+          return Star;
+        case 'BookOpen':
+          return BookOpen;
+        case 'Award':
+          return Award;
+        default:
+          return Music; // Default icon if no match
+      }
+    })()
+  }))
+:  [
     { number: `${incrementYearly(4)}+`, label: "Musical Styles", icon: Music },
     { number: `${incrementWeekly(300)}+`, label: "Style Selections", icon: CheckCircle },
     { number: `${incrementMonthly(17,50)}+`, label: "Languages Adapted", icon: Globe },

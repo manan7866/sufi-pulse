@@ -16,8 +16,19 @@ import {
   Mic
 } from 'lucide-react';
 import { incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { ourMissionPageFallbackData } from '@/lib/cmsFallbackData';
 
 const OurMission = () => {
+  // Fetch CMS data with fallback
+  const { data: cmsData } = useCMSPage({
+    pageSlug: 'our-mission',
+    fallbackData: ourMissionPageFallbackData,
+    enabled: true
+  });
+
+  const pageData = cmsData || ourMissionPageFallbackData;
+
   const missionPillars = [
     {
       icon: Heart,
@@ -59,13 +70,19 @@ const OurMission = () => {
       description: "Operating as a spiritual offering to the global ummah, transcending commercial interests"
     }
   ];
-
-  const stats = [
-    { number: `${incrementWeekly(89)}+`, label: "Writers", description: "Global contributors" },
-    { number: "43", label: "Vocalists", description: "Sacred voices" },
-    { number: "300+", label: "Collaborations", description: "Divine productions" },
-    { number: "100%", label: "Free Service", description: "No cost to writers ever" }
-  ];
+// These fields data coming from database cms
+  const stats = (pageData.stats && pageData.stats.length > 0)
+    ? pageData.stats.map((stat: any) => ({
+        number: stat.stat_number,
+        label: stat.stat_label,
+        description: stat.stat_description
+      }))
+    : [
+        { number: `${incrementWeekly(89)}+`, label: "Writers", description: "Global contributors" },
+        { number: "43", label: "Vocalists", description: "Sacred voices" },
+        { number: "300+", label: "Collaborations", description: "Divine productions" },
+        { number: "100%", label: "Free Service", description: "No cost to writers ever" }
+      ];
 
   return (
     <div className="min-h-screen bg-white">

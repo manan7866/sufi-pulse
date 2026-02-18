@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { getApprovedBlogs } from '@/services/requests';
 import { incrementMonthly, incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 // Predefined list of possible categories from the API (matching blogger categories)
 const possibleCategories = [
@@ -55,7 +57,62 @@ const GuestBlogs = () => {
     ...possibleCategories.map((cat) => ({ ...cat, count: 0 })),
   ]);
 
-  const stats = [
+// These  fields data comming from database cms
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'guest-blogs',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
+
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    icon: (() => {
+      switch (stat.stat_icon) {
+        case 'Users':
+          return Users;
+        case 'Calendar':
+          return Calendar;
+        case 'User':
+          return User;
+        case 'Clock':
+          return Clock;
+        case 'Heart':
+          return Heart;
+        case 'Globe':
+          return Globe;
+        case 'BookOpen':
+          return BookOpen;
+        case 'Star':
+          return Star;
+        case 'ArrowRight':
+          return ArrowRight;
+        case 'Eye':
+          return Eye;
+        case 'MessageCircle':
+          return MessageCircle;
+        case 'Share2':
+          return Share2;
+        case 'Filter':
+          return Filter;
+        case 'Search':
+          return Search;
+        case 'Award':
+          return Award;
+        case 'PenTool':
+          return PenTool;
+        case 'Mic':
+          return Mic;
+        case 'ImageIcon':
+          return ImageIcon;
+        default:
+          return Users; // Default icon if none matches
+      }
+    })(),
+  }))
+: [
     { number: `${incrementWeekly(15)}`, label: 'Guest Contributors', icon: Users },
     { number: `${incrementWeekly(25)}`, label: 'Published Articles', icon: BookOpen },
     { number: `${incrementMonthly(12, 200)}`, label: 'Countries Represented', icon: Globe },

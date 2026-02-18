@@ -23,8 +23,11 @@ import {
   Headphones
 } from 'lucide-react';
 import { incrementMonthly,incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 import { useState, useEffect } from 'react';
 import { getAllSpecialRecognitions } from '@/services/recognition';
+
 
 interface SpecialRecognition {
   id: number;
@@ -87,7 +90,22 @@ const Acknowledgments = () => {
     fetchRecognitions();
   }, []);
 
-  const stats = [
+  const { data: cmsData } = useCMSPage({
+       pageSlug: 'acknowledgments',
+       fallbackData: aboutPageFallbackData,
+       enabled: true
+     });
+  const pageData = cmsData || aboutPageFallbackData;
+
+// These  fields data comming from database cms
+  const stats =  (pageData.stats && pageData.stats.length > 0)
+     ? pageData.stats.map((stat: any) => ({
+         number: stat.stat_number,
+         label: stat.stat_label,
+         description: stat.stat_description,
+         
+       }))
+     : [
     { number: `${incrementWeekly(300)}+`, label: "Collaborations", description: "Sacred productions completed" },
     { number: `${incrementMonthly(43,200)}+`, label: "Countries", description: "Global community reach" },
     { number: `${incrementMonthly(17,50)}+`, label: "Languages", description: "Diverse linguistic representation" },

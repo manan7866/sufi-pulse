@@ -18,6 +18,8 @@ import {
   Heart,
 } from 'lucide-react';
 import { incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 const VocalistHowItWorks = () => {
   const [openIndex, setOpenIndex] = useState(null);
@@ -177,8 +179,25 @@ const VocalistHowItWorks = () => {
       stats: "100% attribution guarantee"
     }
   ];
+// These  fields data comming from database cms
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'vocalist-how-it-works',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
 
-  const stats = [
+
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    icon: stat.stat_icon === 'CheckCircle' ? CheckCircle :
+          stat.stat_icon === 'Clock' ? Clock :
+          stat.stat_icon === 'Award' ? Award :
+          stat.stat_icon === 'Heart' ? Heart : CheckCircle // Default icon
+  }))
+ :  [
     { number: "8", label: "Simple Steps", icon: CheckCircle },
     { number: "4-6", label: "Weeks Timeline", icon: Clock },
     { number: "100%", label: "Free Service", icon: Award },

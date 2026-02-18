@@ -27,6 +27,11 @@ import {
   Compass
 } from 'lucide-react';
 import { incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
+
+
+
 const SufiScienceCenter = () => {
   const researchAreas = [
     {
@@ -110,8 +115,22 @@ const SufiScienceCenter = () => {
       methods: ["Evidence-based production", "Consciousness-enhancing techniques", "Therapeutic sound application"]
     }
   ];
+// These  fields data comming from database cms
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'sufi-science-center',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
 
-  const stats = [
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    description: stat.stat_description,
+    
+  }))
+  :  [
     { number: "2025", label: "Established", description: "Founded as research center" },
     { number: `${incrementWeekly(25)}+`, label: "Research Projects", description: "Active investigations" },
     { number: `${incrementWeekly(100)}+`, label: "Publications", description: "Scientific papers" },

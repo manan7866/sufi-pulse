@@ -17,6 +17,8 @@ import {
   Users,
 } from "lucide-react"
 import { incrementDaily, incrementMonthly, incrementWeekly } from "@/lib/increment"
+import { useCMSPage } from "@/hooks/useCMSPage"
+import { homePageFallbackData } from "@/lib/cmsFallbackData"
 
 const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
 const CHANNEL_ID = "UCraDr3i5A3k0j7typ6tOOsQ"
@@ -94,6 +96,15 @@ const Gallery = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Fetch CMS data with fallback for gallery page
+  const { data: cmsData } = useCMSPage({
+    pageSlug: 'gallery',
+    fallbackData: homePageFallbackData,
+    enabled: true
+  });
+
+  const pageData = cmsData || homePageFallbackData;
+
   const filters = [
     { id: "all", label: "All Videos", count: 0 },
     { id: "popular", label: "Popular", count: 0 },
@@ -158,17 +169,23 @@ const Gallery = () => {
   useEffect(() => {
     fetchYouTubeVideos()
   }, [])
-
-  const stats = [
-    { number: videos.length.toString(), label: "Sacred Videos", icon: Play },
-    { number: `${incrementMonthly(17, 50)}+`, label: "Languages", icon: Globe },
-    {
-      number: videos.reduce((total, video) => total + Number.parseInt(video.views.replace(/[KM]/g, "")), 0) + "K+",
-      label: "Total Views",
-      icon: Eye,
-    },
-    { number: `${incrementMonthly(43, 200)}+`, label: "Countries Reached", icon: Heart },
-  ]
+//These fields data coming from database cms
+  const stats = (pageData.stats && pageData.stats.length > 0)
+    ? pageData.stats.map((stat: any) => ({
+        number: stat.stat_number === '0' ? videos.length.toString() : stat.stat_number,
+        label: stat.stat_label,
+        icon: stat.stat_icon === 'Play' ? Play : stat.stat_icon === 'Globe' ? Globe : stat.stat_icon === 'Eye' ? Eye : Heart
+      }))
+    : [
+        { number: videos.length.toString(), label: "Sacred Videos", icon: Play },
+        { number: `${incrementMonthly(17, 50)}+`, label: "Languages", icon: Globe },
+        {
+          number: videos.reduce((total, video) => total + Number.parseInt(video.views.replace(/[KM]/g, "")), 0) + "K+",
+          label: "Total Views",
+          icon: Eye,
+        },
+        { number: `${incrementMonthly(43, 200)}+`, label: "Countries Reached", icon: Heart },
+      ];
 
   const searchedVideos = videos.filter((video) => {
     const matchesSearch =

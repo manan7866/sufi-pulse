@@ -22,6 +22,8 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { incrementYearly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 
 const SufiMusicTheory = () => {
   const [activeTab, setActiveTab] = useState('fundamentals');
@@ -137,8 +139,41 @@ const SufiMusicTheory = () => {
       image: "https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=200"
     }
   ];
+// These  fields data comming from database cms
+const { data: cmsData } = useCMSPage({
+  pageSlug: 'sufi-music-theory',
+  fallbackData: aboutPageFallbackData,
+  enabled: true
+});
+const pageData = cmsData || aboutPageFallbackData;
 
-  const stats = [
+const stats =  (pageData.stats && pageData.stats.length > 0)
+? pageData.stats.map((stat: any) => ({
+    number: stat.stat_number,
+    label: stat.stat_label,
+    icon: (() => {
+      switch (stat.stat_icon) {
+        case 'BookOpen': return BookOpen;
+        case 'Music': return Music;
+        case 'Heart': return Heart;
+        case 'Star': return Star;
+        case 'Waves': return Waves;
+        case 'Brain': return Brain;
+        case 'Volume2': return Volume2;
+        case 'ArrowRight': return ArrowRight;
+        case 'Play': return Play;
+        case 'Eye': return Eye;
+        case 'Clock': return Clock;
+        case 'User': return User;
+        case 'Headphones': return Headphones;
+        case 'Mic': return Mic;
+        case 'Award': return Award;
+        case 'Globe': return Globe;
+        default: return Music; // Default icon if none matches
+      }
+    })()
+  }))
+  :  [
     { number: `1000+`, label: "Years of Tradition", icon: BookOpen },
     { number: `${incrementYearly(25)}+`, label: "Musical Modes", icon: Music },
     { number: `${incrementYearly(50)}+`, label: "Rhythmic Patterns", icon: Heart },

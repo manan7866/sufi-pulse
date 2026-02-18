@@ -1,12 +1,23 @@
 'use client'
 import React from 'react';
 import Link from 'next/link';
-import { 
-  Heart, Globe, Users, Award, BookOpen, Star, 
-  Shield, Zap, Target, Building, Compass, Leaf 
+import {
+  Heart, Globe, Users, Award, BookOpen, Star,
+  Shield, Zap, Target, Building, Compass, Leaf
 } from 'lucide-react';
 import { incrementMonthly,incrementWeekly } from '@/lib/increment';
+import { useCMSPage } from '@/hooks/useCMSPage';
+import { aboutPageFallbackData } from '@/lib/cmsFallbackData';
 const WhoWeAre = () => {
+  // Fetch CMS data with fallback
+  const { data: cmsData } = useCMSPage({
+    pageSlug: 'who-we-are',
+    fallbackData: aboutPageFallbackData,
+    enabled: true
+  });
+
+  const pageData = cmsData || aboutPageFallbackData;
+
   const coreValues = [
     {
       icon: Heart,
@@ -48,13 +59,19 @@ const WhoWeAre = () => {
       stats: "50+ countries connected"
     }
   ];
-
-  const stats = [
-    { number: `${incrementWeekly(300)}+`, label: "Sacred Collaborations", description: "Divine kalam brought to life" },
-    { number: `${incrementWeekly(89)}+`, label: "Writers", description: "From 50+ countries" },
-    { number: `${incrementWeekly(43)}+`, label: "Vocalists", description: "Diverse spiritual voices" },
-    { number: "100%", label: "Free Service", description: "No cost to writers ever" }
-  ];
+// These fields data coming from database cms
+  const stats = (pageData.stats && pageData.stats.length > 0)
+    ? pageData.stats.map((stat: any) => ({
+        number: stat.stat_number,
+        label: stat.stat_label,
+        description: stat.stat_description
+      }))
+    : [
+        { number: `${incrementWeekly(300)}+`, label: "Sacred Collaborations", description: "Divine kalam brought to life" },
+        { number: `${incrementWeekly(89)}+`, label: "Writers", description: "From 50+ countries" },
+        { number: `${incrementWeekly(43)}+`, label: "Vocalists", description: "Diverse spiritual voices" },
+        { number: "100%", label: "Free Service", description: "No cost to writers ever" }
+      ];
 
   return (
     <div className="min-h-screen bg-white">

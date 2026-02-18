@@ -10,3 +10,4 @@ from .writer import router as writer_router
 from .blogger import router as blogger_router
 from .youtube import router as youtube_router
 from .recording_requests import router as recording_requests_router
+from .cms import router as cms_router
