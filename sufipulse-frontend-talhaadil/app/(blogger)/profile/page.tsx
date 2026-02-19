@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
-import { submitBlogProfile } from '@/services/blogger';
+import { submitBloggerProfile } from '@/services/blogger';
 import Cookies from 'js-cookie';
 
 const BloggerProfilePage = () => {
@@ -77,7 +77,7 @@ const BloggerProfilePage = () => {
       };
 
       // Send profile data to backend using service
-      const response = await submitBlogProfile(dataToSend);
+      const response = await submitBloggerProfile(dataToSend);
 
       if (response.status === 200) {
         toast.success('Profile updated successfully!');

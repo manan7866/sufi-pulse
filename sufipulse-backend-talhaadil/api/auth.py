@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from datetime import datetime
 import psycopg2
@@ -13,6 +13,21 @@ from typing import Optional
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# Handle OPTIONS requests explicitly BEFORE any POST routes
+# These must be defined before POST routes to take precedence
+@router.options("/login")
+@router.options("/signup")
+@router.options("/refresh-token")
+@router.options("/change-password")
+@router.options("/forgot-password")
+@router.options("/reset-password")
+@router.options("/verify-otp")
+@router.options("/resend-otp")
+@router.options("/google")
+async def options_handler():
+    from fastapi.responses import JSONResponse
+    return JSONResponse(content={"status": "ok"})
 
 
 class GoogleAuthRequest(BaseModel):
