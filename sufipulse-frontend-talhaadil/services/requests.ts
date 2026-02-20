@@ -183,3 +183,91 @@ export const getBlogById = (blogId: number) => {
     },
   });
 };
+
+// ==================== BLOG ENGAGEMENT SERVICES ====================
+
+/**
+ * Record a blog view (called when page loads)
+ * Prevents duplicate views from same user/IP
+ */
+export const recordBlogView = (blogId: number) => {
+  return api.post(`/public/blogs/${blogId}/view`, {}, {
+    headers: {
+      requiresAuth: true,
+    },
+  });
+};
+
+/**
+ * Toggle like on a blog post
+ * Returns current like status and count
+ */
+export const toggleBlogLike = (blogId: number) => {
+  return api.post(`/public/blogs/${blogId}/like`, {}, {
+    headers: {
+      requiresAuth: true,
+    },
+  });
+};
+
+/**
+ * Check if current user has liked a blog
+ */
+export const getBlogLikeStatus = (blogId: number) => {
+  return api.get(`/public/blogs/${blogId}/like/status`, {
+    headers: {
+      requiresAuth: true,
+    },
+  });
+};
+
+/**
+ * Add a comment to a blog post
+ */
+export const addBlogComment = (blogId: number, data: {
+  comment_text: string;
+  commenter_name?: string;
+  commenter_email?: string;
+  parent_id?: number;
+}) => {
+  return api.post(`/public/blogs/${blogId}/comment`, data, {
+    headers: {
+      requiresAuth: true,  // Changed to true to send auth token
+    },
+  });
+};
+
+/**
+ * Get all approved comments for a blog post
+ */
+export const getBlogComments = (blogId: number) => {
+  return api.get(`/public/blogs/${blogId}/comments`, {
+    headers: {
+      requiresAuth: false,
+    },
+  });
+};
+
+/**
+ * Record a blog share event
+ */
+export const recordBlogShare = (blogId: number, platform: string) => {
+  return api.post(`/public/blogs/${blogId}/share`, {
+    platform: platform,
+  }, {
+    headers: {
+      requiresAuth: true,
+    },
+  });
+};
+
+/**
+ * Get comprehensive engagement statistics for a blog
+ */
+export const getBlogEngagementStats = (blogId: number) => {
+  return api.get(`/public/blogs/${blogId}/engagement`, {
+    headers: {
+      requiresAuth: false,
+    },
+  });
+};

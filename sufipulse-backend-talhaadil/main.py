@@ -28,6 +28,7 @@ async def startup_db_client():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://sufi-pulse-five.vercel.app",
         "http://localhost:3000",
         "http://127.0.0.1:3001",
         "https://sufipulse.com",

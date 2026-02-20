@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request, Depends, Header
 from pydantic import BaseModel
 from typing import List, Optional
 from db.connection import DBConnection
 from datetime import datetime
 from sql.combinedQueries import Queries
 from utils.otp import send_template_email
+from utils.jwt_handler import get_current_user_optional
 
 router = APIRouter(prefix="/public", tags=["Public"])
 
@@ -263,4 +264,358 @@ def submit_contact_form(data: ContactFormSubmit):
         raise
     except Exception as e:
         print(f"Error in contact form: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== BLOG ENGAGEMENT ENDPOINTS ====================
+
+class BlogViewRequest(BaseModel):
+    blog_id: int
+
+class BlogLikeRequest(BaseModel):
+    blog_id: int
+
+class BlogCommentRequest(BaseModel):
+    comment_text: str
+    commenter_name: Optional[str] = None
+    commenter_email: Optional[str] = None
+    parent_id: Optional[int] = None
+
+class BlogShareRequest(BaseModel):
+    platform: str  # 'whatsapp', 'facebook', 'twitter', 'linkedin', 'email', etc.
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP address from request headers"""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+@router.post("/blogs/{blog_id}/view")
+def record_blog_view(
+    blog_id: int,
+    request: Request,
+    user_id: Optional[int] = Depends(get_current_user_optional)
+):
+    """
+    Record a blog view. Uses user_id if authenticated, otherwise uses IP address.
+    Prevents duplicate views from same user/IP.
+    """
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+
+    try:
+        # Check if blog exists
+        blog = db.fetch_blog_by_id(blog_id)
+        if not blog:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+
+        # Get client IP for unique view tracking
+        ip_address = get_client_ip(request)
+        user_agent = request.headers.get("user-agent", "")
+
+        # Record the view (returns True if unique view was counted)
+        is_unique = db.record_blog_view(
+            blog_id=blog_id,
+            user_id=user_id,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+        # Get updated blog data with new view count
+        updated_blog = db.fetch_blog_by_id(blog_id)
+
+        return {
+            "message": "View recorded",
+            "is_unique_view": is_unique,
+            "views": updated_blog.get('view_count', 0) if updated_blog else 0
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error recording blog view: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/blogs/{blog_id}/like")
+def toggle_blog_like(
+    blog_id: int,
+    request: Request,
+    user_id: Optional[int] = Depends(get_current_user_optional)
+):
+    """
+    Toggle like on a blog post. Returns current like status and count.
+    If user already liked, it removes the like (unlike).
+    """
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+
+    try:
+        # Check if blog exists
+        blog = db.fetch_blog_by_id(blog_id)
+        if not blog:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+
+        # Get client IP for non-authenticated users
+        ip_address = get_client_ip(request)
+
+        # Toggle the like and get result
+        result = db.record_blog_like(
+            blog_id=blog_id,
+            user_id=user_id,
+            ip_address=ip_address
+        )
+
+        # Get updated blog data with new like count
+        updated_blog = db.fetch_blog_by_id(blog_id)
+
+        return {
+            "message": "Like toggled successfully",
+            "liked": result['liked'],
+            "likes": updated_blog.get('like_count', 0) if updated_blog else 0
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error toggling blog like: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/blogs/{blog_id}/like/status")
+def get_blog_like_status(
+    blog_id: int,
+    request: Request,
+    user_id: Optional[int] = Depends(get_current_user_optional)
+):
+    """Check if the current user has liked a blog post"""
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+
+    try:
+        ip_address = get_client_ip(request)
+
+        is_liked = db.is_user_liked_blog(
+            blog_id=blog_id,
+            user_id=user_id,
+            ip_address=ip_address
+        )
+
+        return {"liked": is_liked}
+    except Exception as e:
+        print(f"Error checking like status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/blogs/{blog_id}/comment")
+def add_blog_comment(
+    blog_id: int,
+    data: BlogCommentRequest,
+    request: Request,
+    user_id: Optional[int] = Depends(get_current_user_optional)
+):
+    """
+    Add a comment to a blog post.
+    If user is authenticated, uses their info from database. Otherwise requires name and email.
+    """
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+
+    try:
+        print(f"\n=== COMMENT REQUEST ===")
+        print(f"Blog ID: {blog_id}")
+        print(f"User ID from token: {user_id}")
+        print(f"Request headers: {dict(request.headers)}")
+        print(f"Comment data: {data}")
+        print(f"======================\n")
+
+        # Validate input
+        if not data.comment_text or not data.comment_text.strip():
+            raise HTTPException(status_code=400, detail="Comment text is required")
+
+        if len(data.comment_text) > 2000:
+            raise HTTPException(status_code=400, detail="Comment must be less than 2000 characters")
+
+        # Check if blog exists
+        blog = db.fetch_blog_by_id(blog_id)
+        if not blog:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+
+        # Initialize commenter info
+        commenter_name = None
+        commenter_email = None
+
+        if user_id:
+            # User is authenticated - ALWAYS fetch their info from database
+            print(f"Fetching user info for user_id: {user_id}")
+            user_query = "SELECT name, email FROM users WHERE id = %s"
+            with conn.cursor() as cur:
+                cur.execute(user_query, (user_id,))
+                user_result = cur.fetchone()
+                print(f"User query result: {user_result}")
+                if user_result:
+                    commenter_name = user_result[0]
+                    commenter_email = user_result[1]
+                    print(f"User found: {commenter_name} ({commenter_email})")
+                else:
+                    raise HTTPException(status_code=404, detail="User not found")
+        else:
+            print("No user_id found - treating as guest user")
+            # User is not authenticated - require name and email
+            if not data.commenter_name or not data.commenter_email:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Name and email are required for non-authenticated users"
+                )
+            commenter_name = data.commenter_name
+            commenter_email = data.commenter_email
+
+        # Check if replying to a parent comment
+        parent_id = data.parent_id
+        if parent_id:
+            # Verify parent comment exists and belongs to the same blog
+            parent_comment_query = "SELECT id, blog_id FROM blog_comments WHERE id = %s"
+            with conn.cursor() as cur:
+                cur.execute(parent_comment_query, (parent_id,))
+                parent_comment = cur.fetchone()
+                if not parent_comment or parent_comment[1] != blog_id:
+                    raise HTTPException(status_code=404, detail="Parent comment not found")
+
+        # Add the comment
+        print(f"Adding comment with: user_id={user_id}, name={commenter_name}, email={commenter_email}")
+        comment_id = db.add_blog_comment(
+            blog_id=blog_id,
+            comment_text=data.comment_text,
+            user_id=user_id,
+            commenter_name=commenter_name,
+            commenter_email=commenter_email,
+            parent_id=parent_id
+        )
+
+        if not comment_id:
+            raise HTTPException(status_code=500, detail="Failed to add comment")
+
+        # Get the created comment
+        comments = db.get_blog_comments(blog_id)
+        created_comment = next((c for c in comments if c['id'] == comment_id), None)
+
+        return {
+            "message": "Comment added successfully",
+            "comment_id": comment_id,
+            "comment": created_comment
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding blog comment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/blogs/{blog_id}/comments")
+def get_blog_comments(blog_id: int):
+    """Get all approved comments for a blog post"""
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+
+    try:
+        # Check if blog exists
+        blog = db.fetch_blog_by_id(blog_id)
+        if not blog:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+
+        comments = db.get_blog_comments(blog_id, only_approved=True)
+
+        return {
+            "blog_id": blog_id,
+            "total_comments": len(comments),
+            "comments": comments
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching blog comments: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/blogs/{blog_id}/share")
+def record_blog_share(
+    blog_id: int,
+    data: BlogShareRequest,
+    request: Request,
+    user_id: Optional[int] = Depends(get_current_user_optional)
+):
+    """Record a blog share event for analytics"""
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+
+    try:
+        # Check if blog exists
+        blog = db.fetch_blog_by_id(blog_id)
+        if not blog:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+
+        # Validate platform
+        allowed_platforms = ['whatsapp', 'facebook', 'twitter', 'linkedin', 'email', 'copy-link', 'other']
+        if data.platform.lower() not in allowed_platforms:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid platform. Allowed: {', '.join(allowed_platforms)}"
+            )
+
+        # Get client IP
+        ip_address = get_client_ip(request)
+
+        # Record the share
+        success = db.record_blog_share(
+            blog_id=blog_id,
+            platform=data.platform.lower(),
+            user_id=user_id,
+            ip_address=ip_address
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to record share")
+
+        return {
+            "message": "Share recorded successfully",
+            "platform": data.platform.lower()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error recording blog share: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/blogs/{blog_id}/engagement")
+def get_blog_engagement_stats(blog_id: int):
+    """Get comprehensive engagement statistics for a blog post"""
+    conn = DBConnection.get_connection()
+    db = Queries(conn)
+
+    try:
+        # Check if blog exists
+        blog = db.fetch_blog_by_id(blog_id)
+        if not blog:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+
+        # Get engagement stats
+        stats = db.get_blog_engagement_stats(blog_id)
+        share_stats = db.get_blog_share_stats(blog_id)
+
+        return {
+            "blog_id": blog_id,
+            "views": stats.get('total_views', 0) if stats else 0,
+            "likes": stats.get('total_likes', 0) if stats else 0,
+            "comments": stats.get('total_comments', 0) if stats else 0,
+            "shares": stats.get('total_shares', 0) if stats else 0,
+            "share_breakdown": share_stats or {}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching engagement stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

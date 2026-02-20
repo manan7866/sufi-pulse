@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import Cookies from 'js-cookie';
 import {
   ArrowLeft,
   Calendar,
@@ -21,16 +22,43 @@ import {
   Twitter,
   Facebook,
   Linkedin,
-  PenTool,
-  Clock,
-  TrendingUp,
   Bookmark,
   ExternalLink,
+  Send,
+  Reply,
+  Clock,
+  PenTool,
+  TrendingUp,
 } from 'lucide-react';
-import { getBlogById, getApprovedBlogs } from '@/services/requests';
+import { 
+  getBlogById, 
+  getApprovedBlogs,
+  recordBlogView,
+  toggleBlogLike,
+  getBlogLikeStatus,
+  getBlogComments,
+  addBlogComment,
+  recordBlogShare 
+} from '@/services/requests';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+interface Comment {
+  id: number;
+  blog_id: number;
+  user_id: number | null;
+  commenter_name: string | null;
+  commenter_email: string | null;
+  comment_text: string;
+  parent_id: number | null;
+  is_approved: boolean;
+  created_at: string;
+  updated_at: string;
+  user_name: string | null;
+  user_email: string | null;
+  replies: Comment[];
 }
 
 export default function BlogPostDetailPage({ params }: PageProps) {
@@ -40,6 +68,20 @@ export default function BlogPostDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [relatedBlogs, setRelatedBlogs] = useState<any[]>([]);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  
+  // Engagement states
+  const [views, setViews] = useState(0);
+  const [likes, setLikes] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [commenterName, setCommenterName] = useState('');
+  const [commenterEmail, setCommenterEmail] = useState('');
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Predefined categories with colors
   const categoryColors: Record<string, string> = {
@@ -58,6 +100,22 @@ export default function BlogPostDetailPage({ params }: PageProps) {
     'sufi inquiry': 'Sufi Inquiry',
   };
 
+  // Load user info from cookies on mount
+  useEffect(() => {
+    const userName = Cookies.get('name');
+    const userEmail = Cookies.get('email');
+    const accessToken = Cookies.get('access_token');
+    const userId = Cookies.get('user_id');
+    
+    console.log('Cookies on load:', { userName, userEmail, accessToken, userId });
+    
+    if (accessToken && (userName || userId)) {
+      setIsLoggedIn(true);
+      if (userName) setCommenterName(userName);
+      if (userEmail) setCommenterEmail(userEmail);
+    }
+  }, []);
+
   useEffect(() => {
     fetchBlogPost();
   }, [resolvedParams.id]);
@@ -72,6 +130,29 @@ export default function BlogPostDetailPage({ params }: PageProps) {
 
       if (foundBlog) {
         setBlog(foundBlog);
+        setViews(foundBlog.view_count || 0);
+        setLikes(foundBlog.like_count || 0);
+
+        // Record view (will only count unique views)
+        try {
+          const viewResponse = await recordBlogView(parseInt(resolvedParams.id));
+          if (viewResponse.data.is_unique_view) {
+            setViews(viewResponse.data.views);
+          }
+        } catch (error) {
+          console.error('Failed to record view:', error);
+        }
+
+        // Check if user already liked this blog
+        try {
+          const likeStatusResponse = await getBlogLikeStatus(parseInt(resolvedParams.id));
+          setIsLiked(likeStatusResponse.data.liked);
+        } catch (error) {
+          console.error('Failed to get like status:', error);
+        }
+
+        // Fetch comments
+        fetchComments(parseInt(resolvedParams.id));
 
         const allBlogsResponse = await getApprovedBlogs({
           skip: 0,
@@ -100,6 +181,129 @@ export default function BlogPostDetailPage({ params }: PageProps) {
     }
   };
 
+  const fetchComments = async (blogId: number) => {
+    try {
+      const commentsResponse = await getBlogComments(blogId);
+      setComments(commentsResponse.data.comments || []);
+    } catch (error) {
+      console.error('Failed to fetch comments:', error);
+    }
+  };
+
+  const handleLikeToggle = async () => {
+    // Check if user is logged in
+    const accessToken = Cookies.get('access_token');
+    if (!accessToken) {
+      toast.error('Please login to like blogs');
+      setTimeout(() => {
+        router.push('/login');
+      }, 1000);
+      return;
+    }
+
+    try {
+      const response = await toggleBlogLike(parseInt(resolvedParams.id));
+      setIsLiked(response.data.liked);
+      setLikes(response.data.likes);
+
+      if (response.data.liked) {
+        toast.success('Blog liked!');
+      } else {
+        toast('Blog unliked', { icon: '👍' });
+      }
+    } catch (error: any) {
+      console.error('Error toggling like:', error);
+      toast.error('Failed to toggle like');
+    }
+  };
+
+  const handleShare = async (platform: string) => {
+    try {
+      // Record the share in database
+      await recordBlogShare(parseInt(resolvedParams.id), platform);
+      
+      const url = typeof window !== 'undefined' ? window.location.href : '';
+      const text = encodeURIComponent(blog?.title || 'Check out this blog');
+
+      const shareUrls: Record<string, string> = {
+        whatsapp: `https://wa.me/?text=${text}%20${encodeURIComponent(url)}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      };
+
+      if (shareUrls[platform]) {
+        window.open(shareUrls[platform], '_blank');
+        toast.success(`Shared to ${platform}!`);
+      }
+    } catch (error: any) {
+      console.error('Error sharing:', error);
+      // Still open share even if recording fails
+      const url = typeof window !== 'undefined' ? window.location.href : '';
+      const text = encodeURIComponent(blog?.title || 'Check out this blog');
+      
+      if (platform === 'whatsapp') {
+        window.open(`https://wa.me/?text=${text}%20${encodeURIComponent(url)}`, '_blank');
+      } else if (platform === 'facebook') {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+      }
+    }
+  };
+
+  const handleAddComment = async (parentId: number | null = null) => {
+    // Check if user is logged in
+    const accessToken = Cookies.get('access_token');
+    if (!accessToken) {
+      toast.error('Please login to comment');
+      setTimeout(() => {
+        router.push('/login');
+      }, 1000);
+      return;
+    }
+
+    const text = parentId ? replyText : commentText;
+
+    if (!text.trim()) {
+      toast.error('Please enter a comment');
+      return;
+    }
+
+    try {
+      setIsSubmittingComment(true);
+
+      // Only send comment_text and parent_id for authenticated users
+      // The backend will get user info from the token
+      const commentData: any = {
+        comment_text: text,
+      };
+
+      if (parentId) {
+        commentData.parent_id = parentId;
+      }
+
+      console.log('Sending comment data:', commentData);
+
+      const response = await addBlogComment(parseInt(resolvedParams.id), commentData);
+
+      console.log('Comment response:', response);
+
+      // Refresh comments
+      await fetchComments(parseInt(resolvedParams.id));
+
+      // Clear form
+      setCommentText('');
+      setReplyText('');
+      setReplyingTo(null);
+
+      toast.success(parentId ? 'Reply added!' : 'Comment added!');
+    } catch (error: any) {
+      console.error('Error adding comment:', error);
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to add comment';
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmittingComment(false);
+      setIsSubmittingReply(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return 'No date';
     const date = new Date(dateString);
@@ -118,25 +322,95 @@ export default function BlogPostDetailPage({ params }: PageProps) {
     return categoryLabels[category?.toLowerCase()] || category || 'General';
   };
 
-  const handleShare = (platform: string) => {
-    const url = typeof window !== 'undefined' ? window.location.href : '';
-    const text = encodeURIComponent(blog?.title || 'Check out this blog');
-
-    const shareUrls: Record<string, string> = {
-      twitter: `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(url)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-      linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${text}`,
-      email: `mailto:?subject=${text}&body=${encodeURIComponent(url)}`,
-    };
-
-    if (shareUrls[platform]) {
-      window.open(shareUrls[platform], '_blank');
-    }
-  };
-
   const toggleBookmark = () => {
     setIsBookmarked(!isBookmarked);
     toast.success(isBookmarked ? 'Removed from bookmarks' : 'Added to bookmarks');
+  };
+
+  const renderComment = (comment: Comment, isReply = false) => {
+    const authorName = comment.user_name || comment.commenter_name || 'Anonymous';
+    const isCommentAuthor = comment.commenter_email === 'test@example.com'; // You can add auth check here
+
+    return (
+      <div key={comment.id} className={`${isReply ? 'ml-8 mt-4' : ''}`}>
+        <div className={`bg-gradient-to-br ${isReply ? 'from-slate-50 to-gray-50' : 'from-white to-slate-50'} rounded-2xl p-6 border ${isReply ? 'border-slate-200' : 'border-slate-100'} shadow-sm hover:shadow-md transition-all duration-300`}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center space-x-3">
+              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${isReply ? 'from-slate-400 to-slate-500' : 'from-emerald-400 to-emerald-600'} flex items-center justify-center ring-2 ring-white shadow-md`}>
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-800">{authorName}</p>
+                <p className="text-xs text-slate-500">{formatDate(comment.created_at)}</p>
+              </div>
+            </div>
+          </div>
+          
+          <p className="text-slate-700 leading-relaxed mb-4">{comment.comment_text}</p>
+          
+          <div className="flex items-center space-x-4">
+            {isLoggedIn ? (
+              <button
+                onClick={() => setReplyingTo(comment.id)}
+                className="inline-flex items-center space-x-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors duration-200"
+              >
+                <Reply className="w-4 h-4" />
+                <span>Reply</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  toast.error('Please login to reply');
+                  router.push('/login');
+                }}
+                className="inline-flex items-center space-x-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors duration-200"
+              >
+                <Reply className="w-4 h-4" />
+                <span>Reply</span>
+              </button>
+            )}
+          </div>
+
+          {replyingTo === comment.id && isLoggedIn && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Write your reply..."
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 resize-none text-slate-700 placeholder-slate-400"
+              />
+              <div className="flex items-center space-x-3 mt-3">
+                <button
+                  onClick={() => handleAddComment(comment.id)}
+                  disabled={isSubmittingReply}
+                  className="inline-flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-5 py-2.5 rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{isSubmittingReply ? 'Posting...' : 'Post Reply'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setReplyingTo(null);
+                    setReplyText('');
+                  }}
+                  className="text-slate-600 hover:text-slate-800 font-medium px-4 py-2.5 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Render replies */}
+        {comment.replies && comment.replies.length > 0 && (
+          <div className="mt-4">
+            {comment.replies.map((reply) => renderComment(reply, true))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -199,41 +473,13 @@ export default function BlogPostDetailPage({ params }: PageProps) {
               <button
                 onClick={toggleBookmark}
                 className={`p-2.5 rounded-lg transition-all duration-200 ${
-                  isBookmarked 
-                    ? 'bg-emerald-100 text-emerald-600' 
+                  isBookmarked
+                    ? 'bg-emerald-100 text-emerald-600'
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
                 title="Bookmark"
               >
                 <Bookmark className={`w-5 h-5 ${isBookmarked ? 'fill-current' : ''}`} />
-              </button>
-              <button
-                onClick={() => handleShare('twitter')}
-                className="p-2.5 text-slate-600 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                title="Share on Twitter"
-              >
-                <Twitter className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleShare('facebook')}
-                className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                title="Share on Facebook"
-              >
-                <Facebook className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleShare('linkedin')}
-                className="p-2.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                title="Share on LinkedIn"
-              >
-                <Linkedin className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleShare('email')}
-                className="p-2.5 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200"
-                title="Share via Email"
-              >
-                <Mail className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -253,7 +499,7 @@ export default function BlogPostDetailPage({ params }: PageProps) {
               }}
             />
           ) : (
-            <div className={`w-full h-full bg-gradient-to-br ${categoryColor} flex items-center justify-center`}>
+            <div className={`w-full h-full bg-gradient-to-br bg-green-400 flex items-center justify-center`}>
               <BookOpen className="w-40 h-40 text-white/30" />
             </div>
           )}
@@ -351,7 +597,7 @@ export default function BlogPostDetailPage({ params }: PageProps) {
         )}
 
         {/* Content */}
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 overflow-hidden border border-slate-100">
+        <div className="bg-white rounded-3xl overflow-hidden border border-slate-100">
           <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"></div>
           <div className="prose prose-lg max-w-none">
             <div
@@ -361,42 +607,79 @@ export default function BlogPostDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Stats Bar */}
-        <div className="mt-10 bg-white rounded-2xl shadow-lg shadow-slate-200/50 p-8 border border-slate-100">
+        {/* Engagement Stats Bar - UPDATED WITH WHATSAPP & FACEBOOK SHARE */}
+        <div className="mt-10 bg-white rounded-2xl shadow-lg p-8 border border-slate-100">
           <div className="flex items-center justify-between flex-wrap gap-6">
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-4 sm:space-x-6">
+              {/* Views */}
               <div className="flex items-center space-x-3">
                 <div className="p-2.5 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-xl">
                   <Eye className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-800">{blog.views || 0}</p>
+                  <p className="text-2xl font-bold text-slate-800">{views}</p>
                   <p className="text-sm text-slate-500">Views</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-gradient-to-br from-rose-100 to-rose-50 rounded-xl">
-                  <Heart className="w-5 h-5 text-rose-600" />
+
+              {/* Like Button */}
+              <button
+                onClick={handleLikeToggle}
+                className={`flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                  isLiked
+                    ? 'bg-gradient-to-br from-rose-100 to-rose-50 text-rose-600'
+                    : 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-600 hover:from-rose-50 hover:to-rose-50'
+                }`}
+                title={!isLoggedIn ? 'Login to like' : undefined}
+              >
+                <div className={`p-2.5 rounded-xl ${isLiked ? 'bg-rose-200' : 'bg-slate-200'}`}>
+                  <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-800">Like</p>
-                  <p className="text-sm text-slate-500">Appreciate</p>
+                <div className="text-left">
+                  <p className="text-2xl font-bold">{likes}</p>
+                  <p className="text-sm">Likes</p>
                 </div>
-              </div>
+                {!isLoggedIn && (
+                  <div className="hidden lg:flex items-center space-x-1 ml-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
+                    <User className="w-3 h-3" />
+                    <span>Login to like</span>
+                  </div>
+                )}
+              </button>
+
+              {/* Comment Count */}
               <div className="flex items-center space-x-3">
                 <div className="p-2.5 bg-gradient-to-br from-blue-100 to-blue-50 rounded-xl">
                   <MessageCircle className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-800">Comment</p>
-                  <p className="text-sm text-slate-500">Discuss</p>
+                  <p className="text-2xl font-bold text-slate-800">{comments.length}</p>
+                  <p className="text-sm text-slate-500">Comments</p>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 text-slate-600">
-              <Share2 className="w-5 h-5" />
-              <span className="font-medium">Share this article</span>
+            {/* Share Buttons - WhatsApp & Facebook Only */}
+            <div className="flex items-center space-x-3">
+              <span className="text-slate-600 font-medium mr-2 hidden sm:inline">Share:</span>
+              <button
+                onClick={() => handleShare('whatsapp')}
+                className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2.5 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-green-500/30"
+                title="Share on WhatsApp"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413"/>
+                </svg>
+                <span className="hidden sm:inline">WhatsApp</span>
+              </button>
+              <button
+                onClick={() => handleShare('facebook')}
+                className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2.5 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/30"
+                title="Share on Facebook"
+              >
+                <Facebook className="w-5 h-5" />
+                <span className="hidden sm:inline">Facebook</span>
+              </button>
             </div>
           </div>
         </div>
@@ -436,6 +719,119 @@ export default function BlogPostDetailPage({ params }: PageProps) {
                 </p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Comments Section */}
+        <div className="mt-16">
+          <div className="flex items-center space-x-3 mb-8">
+            <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-50 rounded-xl">
+              <MessageCircle className="w-6 h-6 text-blue-600" />
+            </div>
+            <h2 className="text-2xl lg:text-3xl font-bold text-slate-800">
+              Comments ({comments.length})
+            </h2>
+          </div>
+
+          {/* Add Comment Form */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 lg:p-8 border border-slate-100 mb-8">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Leave a Comment</h3>
+
+            <div className="space-y-4">
+              {/* Show user info for logged-in users */}
+              {isLoggedIn ? (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center ring-2 ring-emerald-300">
+                      <User className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800">{commenterName || 'Registered User'}</p>
+                      <p className="text-sm text-slate-600">{commenterEmail || 'Email hidden'}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-emerald-700">
+                    ✓ Logged in - Your name and email are automatically attached to comments
+                  </p>
+                </div>
+              ) : (
+                /* Login prompt for non-authenticated users */
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-amber-200">
+                    <User className="w-8 h-8 text-white" />
+                  </div>
+                  <h4 className="text-lg font-bold text-slate-800 mb-2">
+                    Login to Comment
+                  </h4>
+                  <p className="text-slate-600 mb-6 text-sm">
+                    Create an account or login to share your thoughts on this blog
+                  </p>
+                  <div className="flex items-center justify-center space-x-3">
+                    <Link
+                      href="/login"
+                      className="inline-flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:scale-105"
+                    >
+                      <span>Login</span>
+                    </Link>
+                    <Link
+                      href="/register"
+                      className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:scale-105"
+                    >
+                      <span>Register</span>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Comment *
+                </label>
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder={isLoggedIn ? "Share your thoughts..." : "Login to comment"}
+                  rows={5}
+                  disabled={!isLoggedIn}
+                  className={`w-full px-4 py-3 rounded-xl border transition-all duration-200 resize-none text-slate-700 placeholder-slate-400 ${
+                    isLoggedIn
+                      ? 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+                      : 'border-slate-100 bg-slate-50 cursor-not-allowed'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500">
+                  Be respectful and constructive in your comments
+                </p>
+                {isLoggedIn && (
+                  <button
+                    onClick={() => handleAddComment(null)}
+                    disabled={isSubmittingComment || !commentText.trim()}
+                    className="inline-flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                  >
+                    <Send className="w-5 h-5" />
+                    <span>{isSubmittingComment ? 'Posting...' : 'Post Comment'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Comments List */}
+          <div className="space-y-6">
+            {comments.length > 0 ? (
+              comments.map((comment) => renderComment(comment))
+            ) : (
+              <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
+                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageCircle className="w-10 h-10 text-slate-400" />
+                </div>
+                <p className="text-slate-600 font-medium text-lg">No comments yet</p>
+                <p className="text-slate-400 text-sm mt-1">Be the first to share your thoughts!</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -513,7 +909,7 @@ export default function BlogPostDetailPage({ params }: PageProps) {
             backgroundSize: '60px 60px'
           }}></div>
         </div>
-        
+
         <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
 

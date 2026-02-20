@@ -32,7 +32,7 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
   };
 
   return (
-    <div className="border border-gray-300 rounded-md">
+    <div className="border text-black border-gray-300 rounded-md">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 p-2 border-b border-gray-300 bg-gray-50 rounded-t-md">
         <button

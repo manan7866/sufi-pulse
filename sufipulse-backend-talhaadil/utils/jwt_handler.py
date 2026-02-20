@@ -46,3 +46,36 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
     return user_id
+
+
+def get_current_user_optional(authorization: str | None = Header(None)) -> int | None:
+    """
+    Optional authentication - returns user_id if valid token provided, None otherwise.
+    This allows endpoints to work for both authenticated and non-authenticated users.
+    """
+    if not authorization:
+        return None
+    
+    # Extract token from "Bearer <token>" format
+    try:
+        # Handle both "Bearer token" and direct token
+        token = authorization
+        if authorization.startswith("Bearer "):
+            token = authorization.split(" ")[1]
+        
+        print(f"Extracting token: {token[:20]}...")
+        payload = verify_token(token)
+        print(f"Token payload: {payload}")
+        
+        if payload:
+            user_id = payload.get("sub")
+            if user_id:
+                print(f"User ID extracted: {user_id}")
+                return int(user_id)
+    except Exception as e:
+        print(f"Error in get_current_user_optional: {e}")
+        import traceback
+        traceback.print_exc()
+        pass
+    
+    return None
