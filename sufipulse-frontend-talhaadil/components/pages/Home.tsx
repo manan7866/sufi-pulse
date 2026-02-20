@@ -363,7 +363,7 @@ const Home = () => {
                   className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-2xl shadow-xl object-contain bg-white p-2"
                 />
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-emerald-400">SufiPulse</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold text-emerald-400">SufiPulse main</h1>
                   <p className="text-emerald-300 text-xs sm:text-sm">Global Sufi Collaboration Studio</p>
                 </div>
               </div>
