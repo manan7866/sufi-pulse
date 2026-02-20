@@ -304,21 +304,46 @@ class BloggerQueries:
     def record_blog_view(self, blog_id: int, user_id: int = None, ip_address: str = None, user_agent: str = None) -> bool:
         """
         Record a blog view. Returns True if view was counted (unique), False if duplicate.
-        Uses ON CONFLICT to handle unique constraint violations gracefully.
-        """
-        query = """
-            INSERT INTO blog_views (blog_id, user_id, ip_address, user_agent)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (blog_id, user_id, ip_address) DO NOTHING
-            RETURNING id;
+        For authenticated users: checks (blog_id, user_id)
+        For guests: checks (blog_id, ip_address)
         """
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(query, (blog_id, user_id, ip_address, user_agent))
+            if user_id:
+                # For authenticated users, check if they already viewed this blog
+                cur.execute("""
+                    SELECT id FROM blog_views 
+                    WHERE blog_id = %s AND user_id = %s
+                """, (blog_id, user_id))
+            else:
+                # For guests, check if this IP already viewed this blog
+                cur.execute("""
+                    SELECT id FROM blog_views 
+                    WHERE blog_id = %s AND ip_address = %s AND user_id IS NULL
+                """, (blog_id, ip_address))
+            
+            existing_view = cur.fetchone()
+            
+            if existing_view:
+                # Already viewed - don't count again
+                print(f"View already exists for blog {blog_id}, user_id {user_id}, IP {ip_address}")
+                return False
+            
+            # Insert new view
+            cur.execute("""
+                INSERT INTO blog_views (blog_id, user_id, ip_address, user_agent)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+            """, (blog_id, user_id, ip_address, user_agent))
+            
             result = cur.fetchone()
             if result:
                 # Update the cached view count
                 self._update_blog_count(blog_id, 'view_count')
+                self.conn.commit()
+                print(f"New view recorded for blog {blog_id}")
                 return True
+            
+            self.conn.commit()
             return False
 
     def record_blog_like(self, blog_id: int, user_id: int = None, ip_address: str = None) -> dict:
