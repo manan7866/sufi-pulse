@@ -15,7 +15,8 @@ import {
   Eye,
   X,
   Loader2,
-  Info
+  Info,
+  Users
 } from 'lucide-react';
 import {
   getApprovedLyrics,
@@ -37,6 +38,7 @@ interface FormData {
   performance_direction: string;
   availability_confirmed: boolean;
   studio_policies_agreed: boolean;
+  whatsapp_number: string;
   referenceFile?: File | null;
 }
 
@@ -48,6 +50,7 @@ interface FormErrors {
   performance_direction?: string;
   availability_confirmed?: string;
   studio_policies_agreed?: string;
+  whatsapp_number?: string;
 }
 
 const StudioRecordingRequestForm: React.FC<StudioRecordingRequestFormProps> = ({
@@ -68,6 +71,7 @@ const StudioRecordingRequestForm: React.FC<StudioRecordingRequestFormProps> = ({
     performance_direction: '',
     availability_confirmed: false,
     studio_policies_agreed: false,
+    whatsapp_number: '',
     referenceFile: null,
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -183,6 +187,11 @@ const StudioRecordingRequestForm: React.FC<StudioRecordingRequestFormProps> = ({
     } else if (formData.performance_direction.trim().length < 20) {
       newErrors.performance_direction = 'Please provide more detailed performance direction (at least 20 characters)';
     }
+    if (!formData.whatsapp_number.trim()) {
+      newErrors.whatsapp_number = 'WhatsApp number is required';
+    } else if (!/^\+?[\d\s-()]+$/.test(formData.whatsapp_number)) {
+      newErrors.whatsapp_number = 'Please enter a valid phone number';
+    }
     if (!formData.availability_confirmed) {
       newErrors.availability_confirmed = 'You must confirm your availability';
     }
@@ -213,6 +222,7 @@ const StudioRecordingRequestForm: React.FC<StudioRecordingRequestFormProps> = ({
         performance_direction: formData.performance_direction,
         availability_confirmed: formData.availability_confirmed,
         studio_policies_agreed: formData.studio_policies_agreed,
+        whatsapp_number: formData.whatsapp_number,
       };
 
       await createStudioRecordingRequest(requestData);
@@ -550,11 +560,47 @@ const StudioRecordingRequestForm: React.FC<StudioRecordingRequestFormProps> = ({
           </div>
         </section>
 
-        {/* Section 4: Confirmation */}
+        {/* Section 4: Contact Information */}
+        <section>
+          <div className="flex items-center space-x-2 mb-4">
+            <Users className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-bold text-slate-900">4. Contact Information</h3>
+          </div>
+
+          <div className="space-y-4">
+            {/* WhatsApp Number */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                WhatsApp Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                name="whatsapp_number"
+                value={formData.whatsapp_number}
+                onChange={handleInputChange}
+                placeholder="+1 234 567 8900"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  errors.whatsapp_number ? 'border-red-500' : 'border-slate-300'
+                }`}
+              />
+              {errors.whatsapp_number && (
+                <p className="mt-1 text-sm text-red-500 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  {errors.whatsapp_number}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-slate-500">
+                We'll use this to contact you about your recording request
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 5: Confirmation */}
         <section>
           <div className="flex items-center space-x-2 mb-4">
             <CheckCircle className="w-5 h-5 text-emerald-600" />
-            <h3 className="text-lg font-bold text-slate-900">4. Confirmation</h3>
+            <h3 className="text-lg font-bold text-slate-900">5. Confirmation</h3>
           </div>
 
           <div className="space-y-3">

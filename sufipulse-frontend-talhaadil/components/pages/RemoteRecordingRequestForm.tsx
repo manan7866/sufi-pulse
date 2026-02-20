@@ -17,7 +17,8 @@ import {
   Mic,
   AudioWaveform,
   Usb,
-  Smartphone
+  Smartphone,
+  Users
 } from 'lucide-react';
 import {
   getApprovedLyrics,
@@ -38,6 +39,7 @@ interface FormData {
   interpretation_notes: string;
   original_recording_confirmed: boolean;
   remote_production_standards_agreed: boolean;
+  whatsapp_number: string;
   sampleFile?: File | null;
 }
 
@@ -48,6 +50,7 @@ interface FormErrors {
   interpretation_notes?: string;
   original_recording_confirmed?: string;
   remote_production_standards_agreed?: string;
+  whatsapp_number?: string;
 }
 
 const RemoteRecordingRequestForm: React.FC<RemoteRecordingRequestFormProps> = ({
@@ -67,6 +70,7 @@ const RemoteRecordingRequestForm: React.FC<RemoteRecordingRequestFormProps> = ({
     interpretation_notes: '',
     original_recording_confirmed: false,
     remote_production_standards_agreed: false,
+    whatsapp_number: '',
     sampleFile: null,
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -185,6 +189,11 @@ const RemoteRecordingRequestForm: React.FC<RemoteRecordingRequestFormProps> = ({
     if (!formData.remote_production_standards_agreed) {
       newErrors.remote_production_standards_agreed = 'You must agree to remote production standards';
     }
+    if (!formData.whatsapp_number.trim()) {
+      newErrors.whatsapp_number = 'WhatsApp number is required';
+    } else if (!/^\+?[\d\s-()]+$/.test(formData.whatsapp_number)) {
+      newErrors.whatsapp_number = 'Please enter a valid phone number';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -208,6 +217,7 @@ const RemoteRecordingRequestForm: React.FC<RemoteRecordingRequestFormProps> = ({
         interpretation_notes: formData.interpretation_notes,
         original_recording_confirmed: formData.original_recording_confirmed,
         remote_production_standards_agreed: formData.remote_production_standards_agreed,
+        whatsapp_number: formData.whatsapp_number,
       };
 
       await createRemoteRecordingRequest(requestData);
@@ -532,11 +542,47 @@ const RemoteRecordingRequestForm: React.FC<RemoteRecordingRequestFormProps> = ({
           </div>
         </section>
 
-        {/* Section 4: Professional Declaration */}
+        {/* Section 4: Contact Information */}
+        <section>
+          <div className="flex items-center space-x-2 mb-4">
+            <Users className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-bold text-slate-900">4. Contact Information</h3>
+          </div>
+
+          <div className="space-y-4">
+            {/* WhatsApp Number */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                WhatsApp Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                name="whatsapp_number"
+                value={formData.whatsapp_number}
+                onChange={handleInputChange}
+                placeholder="+1 234 567 8900"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                  errors.whatsapp_number ? 'border-red-500' : 'border-slate-300'
+                }`}
+              />
+              {errors.whatsapp_number && (
+                <p className="mt-1 text-sm text-red-500 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  {errors.whatsapp_number}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-slate-500">
+                We'll use this to contact you about your recording request
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 5: Professional Declaration */}
         <section>
           <div className="flex items-center space-x-2 mb-4">
             <CheckCircle className="w-5 h-5 text-emerald-600" />
-            <h3 className="text-lg font-bold text-slate-900">4. Professional Declaration</h3>
+            <h3 className="text-lg font-bold text-slate-900">5. Professional Declaration</h3>
           </div>
 
           <div className="space-y-3">

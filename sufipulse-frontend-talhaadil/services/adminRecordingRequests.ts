@@ -3,7 +3,7 @@ import api from "@/lib/axios";
 export interface RecordingRequest {
   id: number;
   vocalist_id: number;
-  blog_id: number;
+  kalam_id: number;
   lyric_title: string;
   lyric_writer: string | null;
   lyric_language: string | null;
@@ -12,6 +12,9 @@ export interface RecordingRequest {
   admin_comments: string | null;
   created_at: string;
   updated_at: string;
+  whatsapp_number: string | null;
+  submitter_name: string | null;
+  submitter_email: string | null;
 }
 
 export interface StudioRecordingRequest extends RecordingRequest {

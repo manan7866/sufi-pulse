@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Mic, Calendar, CheckCircle, XCircle, Clock, Search, Filter, Eye, MessageSquare } from 'lucide-react';
+import { Mic, Calendar, CheckCircle, XCircle, Clock, Search, Filter, Eye, MessageSquare, Users } from 'lucide-react';
 import { getAllStudioRequests, updateStudioRequestStatus, StudioRecordingRequest } from '@/services/adminRecordingRequests';
 import { useToast } from '@/context/ToastContext';
 import toast from 'react-hot-toast';
@@ -219,6 +219,28 @@ const AdminStudioRequests: React.FC = () => {
 
                 {expandedRequestId === request.id && (
                   <div className="mt-4 pt-4 border-t border-slate-200 space-y-4">
+                    {/* Submitter Information */}
+                    <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 border border-emerald-200">
+                      <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center">
+                        <Users className="w-4 h-4 mr-2 text-emerald-600" />
+                        Submitter Information
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs font-medium text-slate-600">Name</p>
+                          <p className="text-sm font-semibold text-slate-900">{request.submitter_name || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-slate-600">Email</p>
+                          <p className="text-sm font-semibold text-slate-900">{request.submitter_email || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-slate-600">WhatsApp</p>
+                          <p className="text-sm font-semibold text-slate-900">{request.whatsapp_number || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm font-medium text-slate-600 mb-1">Preferred Date</p>

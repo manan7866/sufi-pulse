@@ -28,6 +28,7 @@ class StudioRecordingRequestCreate(BaseModel):
     performance_direction: str
     availability_confirmed: bool = False
     studio_policies_agreed: bool = False
+    whatsapp_number: str = Field(..., description="WhatsApp contact number")
 
 class StudioRecordingRequestResponse(BaseModel):
     """Model for studio recording request response"""
@@ -43,6 +44,9 @@ class StudioRecordingRequestResponse(BaseModel):
     estimated_studio_duration: str
     performance_direction: str
     reference_upload_url: Optional[str]
+    whatsapp_number: Optional[str]
+    submitter_name: Optional[str]
+    submitter_email: Optional[str]
     status: str
     created_at: datetime
     updated_at: datetime
@@ -55,6 +59,7 @@ class RemoteRecordingRequestCreate(BaseModel):
     interpretation_notes: str
     original_recording_confirmed: bool = False
     remote_production_standards_agreed: bool = False
+    whatsapp_number: str = Field(..., description="WhatsApp contact number")
 
 class RemoteRecordingRequestResponse(BaseModel):
     """Model for remote recording request response"""
@@ -69,6 +74,9 @@ class RemoteRecordingRequestResponse(BaseModel):
     target_submission_date: date
     interpretation_notes: str
     sample_upload_url: Optional[str]
+    whatsapp_number: Optional[str]
+    submitter_name: Optional[str]
+    submitter_email: Optional[str]
     status: str
     created_at: datetime
     updated_at: datetime
@@ -329,6 +337,14 @@ def create_studio_recording_request(
                 detail="You have already submitted a studio recording request for this kalam."
             )
 
+    # Get user info
+    user = db.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    submitter_name = user.get('name', '')
+    submitter_email = user.get('email', '')
+
     # Validate date (cannot be in the past)
     if request.preferred_session_date < date.today():
         raise HTTPException(
@@ -344,9 +360,10 @@ def create_studio_recording_request(
             preferred_session_date, preferred_time_block,
             estimated_studio_duration, performance_direction,
             availability_confirmed, studio_policies_agreed,
+            whatsapp_number, submitter_name, submitter_email,
             status, created_at, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING *;
     """
 
@@ -364,6 +381,9 @@ def create_studio_recording_request(
             request.performance_direction,
             request.availability_confirmed,
             request.studio_policies_agreed,
+            request.whatsapp_number,
+            submitter_name,
+            submitter_email,
             'pending_review',
             datetime.now(),
             datetime.now()
@@ -385,6 +405,9 @@ def create_studio_recording_request(
         estimated_studio_duration=result['estimated_studio_duration'],
         performance_direction=result['performance_direction'],
         reference_upload_url=result.get('reference_upload_url'),
+        whatsapp_number=result.get('whatsapp_number'),
+        submitter_name=result.get('submitter_name'),
+        submitter_email=result.get('submitter_email'),
         status=result['status'],
         created_at=result['created_at'],
         updated_at=result['updated_at']
@@ -435,6 +458,14 @@ def create_remote_recording_request(
                 detail="You have already submitted a remote recording request for this kalam."
             )
 
+    # Get user info
+    user = db.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    submitter_name = user.get('name', '')
+    submitter_email = user.get('email', '')
+
     # Validate date (cannot be in the past)
     if request.target_submission_date < date.today():
         raise HTTPException(
@@ -450,9 +481,10 @@ def create_remote_recording_request(
             recording_environment, target_submission_date,
             interpretation_notes,
             original_recording_confirmed, remote_production_standards_agreed,
+            whatsapp_number, submitter_name, submitter_email,
             status, created_at, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING *;
     """
 
@@ -469,6 +501,9 @@ def create_remote_recording_request(
             request.interpretation_notes,
             request.original_recording_confirmed,
             request.remote_production_standards_agreed,
+            request.whatsapp_number,
+            submitter_name,
+            submitter_email,
             'under_review',
             datetime.now(),
             datetime.now()
@@ -489,6 +524,9 @@ def create_remote_recording_request(
         target_submission_date=result['target_submission_date'],
         interpretation_notes=result['interpretation_notes'],
         sample_upload_url=result.get('sample_upload_url'),
+        whatsapp_number=result.get('whatsapp_number'),
+        submitter_name=result.get('submitter_name'),
+        submitter_email=result.get('submitter_email'),
         status=result['status'],
         created_at=result['created_at'],
         updated_at=result['updated_at']
