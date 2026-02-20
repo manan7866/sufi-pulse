@@ -65,13 +65,15 @@ export default function KalamDetailsPage() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState("")
 
-  // All possible statuses for kalam submissions
+  // All possible statuses for kalam submissions (matching database constraints)
   const allStatuses = [
-    { value: "pending", label: "Pending", color: "bg-amber-100 text-amber-900" },
-    { value: "under_review", label: "Under Review", color: "bg-blue-100 text-blue-900" },
-    { value: "approved", label: "Approved", color: "bg-emerald-100 text-emerald-900" },
-    { value: "needs_revision", label: "Needs Revision", color: "bg-orange-100 text-orange-900" },
-    { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-900" },
+    { value: "submitted", label: "Submitted", color: "bg-slate-100 text-slate-900" },
+    { value: "changes_requested", label: "Changes Requested", color: "bg-orange-100 text-orange-900" },
+    { value: "admin_approved", label: "Admin Approved", color: "bg-emerald-100 text-emerald-900" },
+    { value: "admin_rejected", label: "Admin Rejected", color: "bg-red-100 text-red-900" },
+    { value: "final_approved", label: "Final Approved (Awaiting Vocalist)", color: "bg-blue-100 text-blue-900" },
+    { value: "complete_approved", label: "Complete Approved", color: "bg-purple-100 text-purple-900" },
+    { value: "posted", label: "Posted", color: "bg-green-100 text-green-900" },
   ]
 
 
@@ -120,13 +122,32 @@ export default function KalamDetailsPage() {
 
     }
   }, [params.id])
-  const statusMap = {
-    final_approved: "Awaiting Vocalist"
+  const statusMap: Record<string, string> = {
+    submitted: "Submitted",
+    changes_requested: "Changes Requested",
+    admin_approved: "Admin Approved",
+    admin_rejected: "Admin Rejected",
+    final_approved: "Awaiting Vocalist",
+    complete_approved: "Complete Approved",
+    posted: "Posted"
+  };
+
+  const getStatusColor = (status: string) => {
+    const statusColors: Record<string, string> = {
+      submitted: "bg-slate-50 text-slate-900",
+      changes_requested: "bg-orange-50 text-orange-900",
+      admin_approved: "bg-emerald-50 text-emerald-900",
+      admin_rejected: "bg-red-50 text-red-900",
+      final_approved: "bg-blue-50 text-blue-900",
+      complete_approved: "bg-purple-50 text-purple-900",
+      posted: "bg-green-50 text-green-900"
+    };
+    return statusColors[status] || "bg-slate-50 text-slate-900";
   };
 
 
 
-  const handleStatusUpdate = async (newStatus: 'pending' | 'under_review' | 'approved' | 'needs_revision' | 'rejected') => {
+  const handleStatusUpdate = async (newStatus: 'submitted' | 'changes_requested' | 'admin_approved' | 'admin_rejected' | 'final_approved' | 'complete_approved' | 'posted') => {
     if (!kalamDetails) return
     setIsSubmitting(true)
     try {
@@ -285,11 +306,34 @@ export default function KalamDetailsPage() {
       
 
       {/* Status Actions for admin_approved (final_approved) */}
-      {submission.status === "final_approved" && submission.vocalist_approval_status !== "approved" && (
+      {submission.status === "final_approved" && (
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Assign Vocalist</h2>
-          <div className="space-y-4">
-            <div className="relative">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">
+            {kalam.vocalist_id ? "✅ Vocalist Assigned" : "Assign Vocalist"}
+          </h2>
+          {kalam.vocalist_id ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <p className="text-emerald-900 font-medium">
+                Vocalist has been assigned to this kalam.
+              </p>
+              <p className="text-emerald-700 text-sm mt-2">
+                The vocalist can now see this kalam in their recording request dropdown at:
+                <br />
+                <code className="bg-emerald-100 px-2 py-1 rounded">/vocalist/recording-requests/studio</code> or
+                <code className="bg-emerald-100 px-2 py-1 rounded">/vocalist/recording-requests/remote</code>
+              </p>
+              {vocalistName && (
+                <p className="text-emerald-800 mt-3">
+                  <strong>Assigned Vocalist:</strong> {vocalistName}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-slate-600 text-sm">
+                Select a vocalist to assign to this final_approved kalam. The vocalist will then be able to submit recording requests.
+              </p>
+              <div className="relative">
               <input
                 type="text"
                 placeholder="Search vocalists by name..."
@@ -346,6 +390,7 @@ export default function KalamDetailsPage() {
               Assign Vocalist
             </button>
           </div>
+          )}
         </div>
       )}
 
@@ -430,22 +475,14 @@ export default function KalamDetailsPage() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-800">Overall Status</label>
-              <span                                                                                  
-                className={`inline-block px-2 py-1 rounded-md text-sm font-medium ml-2 ${submission.status === "approved" || submission.status === "under_review" || submission.status === "posted"
-                  ? "bg-emerald-50 text-emerald-900"
-                  : submission.status === "pending" || submission.status === "submitted"
-                    ? "bg-yellow-50 text-yellow-800"
-                    : "bg-red-50 text-red-800"
-                  }`}
+              <span
+                className={`inline-block px-2 py-1 rounded-md text-sm font-medium ml-2 ${getStatusColor(submission.status)}`}
               >
-                {submission.status === "final_approved"
-                  ? "Awaiting Vocalist"
-                  : submission.status
+                {statusMap[submission.status] || submission.status
                     .split('_')
                     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                     .join(' ')
                 }
-
               </span>
             </div>
             {submission.status === "changes_requested" && (

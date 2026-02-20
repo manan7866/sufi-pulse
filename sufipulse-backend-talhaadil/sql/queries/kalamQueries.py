@@ -359,3 +359,41 @@ class KalamQueries:
             self.conn.commit()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    def fetch_approved_kalams_for_vocalist(self, skip: int = 0, limit: int = 100, vocalist_user_id: int = None) -> List[dict]:
+        """
+        Fetch approved kalams that are available for vocalist recording requests.
+        Shows kalams that are:
+        - final_approved (admin approved, ready for vocalist to request)
+        - OR complete_approved (vocalist has approved and ready for recording)
+        - Does NOT require vocalist assignment - any vocalist can request
+        - Includes writer info
+        """
+        query = """
+            SELECT
+                k.id,
+                k.title,
+                k.language,
+                k.theme AS category,
+                k.kalam_text,
+                k.description,
+                u.name AS writer_name,
+                ks.status,
+                ks.vocalist_approval_status,
+                k.vocalist_id
+            FROM kalams k
+            JOIN users u ON k.writer_id = u.id
+            LEFT JOIN kalam_submissions ks ON ks.kalam_id = k.id
+            WHERE ks.status IN ('final_approved', 'complete_approved')
+            ORDER BY k.created_at DESC
+            OFFSET %s
+            LIMIT %s
+        """
+        print(f"🔍 Executing query with skip={skip}, limit={limit}")
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, (skip, limit))
+            results = cur.fetchall()
+            print(f"✅ Query returned {len(results)} kalams")
+            for r in results:
+                print(f"  - {r['title']} (status: {r['status']}, vocalist_id: {r['vocalist_id']})")
+            return results

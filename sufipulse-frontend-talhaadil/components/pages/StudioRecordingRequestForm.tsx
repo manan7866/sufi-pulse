@@ -83,9 +83,15 @@ const StudioRecordingRequestForm: React.FC<StudioRecordingRequestFormProps> = ({
       setLoading(true);
       const response = await getApprovedLyrics();
       setApprovedLyrics(response.data.lyrics || []);
-      
+
       if (response.data.lyrics.length === 0) {
-        toast.info('No approved lyrics available at the moment. Please check back later.');
+        toast('No approved lyrics available at the moment. Please check back later.', {
+          icon: 'ℹ️',
+          style: {
+            background: '#fef3c7',
+            color: '#92400e',
+          },
+        });
       }
     } catch (error: any) {
       console.error('Error fetching approved lyrics:', error);
@@ -198,9 +204,9 @@ const StudioRecordingRequestForm: React.FC<StudioRecordingRequestFormProps> = ({
 
     try {
       setSubmitting(true);
-      
+
       const requestData = {
-        blog_id: Number(formData.kalam_id),
+        kalam_id: Number(formData.kalam_id),
         preferred_session_date: formData.preferred_session_date,
         preferred_time_block: formData.preferred_time_block as 'Morning' | 'Afternoon' | 'Evening',
         estimated_studio_duration: formData.estimated_studio_duration as '1 Hour' | '2 Hours' | 'Half Day' | 'Full Day',

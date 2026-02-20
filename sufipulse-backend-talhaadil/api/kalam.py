@@ -222,16 +222,24 @@ def update_submission_status(id: int, sub_id: int, data: UpdateSubmissionStatus,
                             user_id: int = Depends(get_current_user)):
     conn = DBConnection.get_connection()
     db = Queries(conn)
-    
-    # Map frontend statuses to backend statuses if needed
+
+    # Map frontend statuses to backend database constraint statuses
     status_mapping = {
-        "pending": "pending",
-        "under_review": "under_review",
-        "approved": "approved",
-        "needs_revision": "needs_revision",
-        "rejected": "rejected"
+        "pending": "submitted",
+        "under_review": "submitted",
+        "approved": "admin_approved",
+        "needs_revision": "changes_requested",
+        "rejected": "admin_rejected",
+        "admin_approved": "admin_approved",
+        "admin_rejected": "admin_rejected",
+        "changes_requested": "changes_requested",
+        "final_approved": "final_approved",
+        "complete_approved": "complete_approved",
+        "posted": "posted",
+        "draft": "draft",
+        "submitted": "submitted"
     }
-    
+
     if data.new_status in status_mapping:
         data.new_status = status_mapping[data.new_status]
 
@@ -247,11 +255,10 @@ def update_submission_status(id: int, sub_id: int, data: UpdateSubmissionStatus,
     if not submission or submission["kalam_id"] != int(id):
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    # Allow all status values
-    valid_statuses = ["pending", "under_review", "approved", "needs_revision", "rejected", 
-                      "admin_approved", "admin_rejected", "changes_requested", 
-                      "final_approved", "complete_approved", "posted"]
-    
+    # Valid statuses according to database constraint
+    valid_statuses = ["draft", "submitted", "changes_requested", "admin_approved", 
+                      "admin_rejected", "final_approved", "complete_approved", "posted"]
+
     if data.new_status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
 

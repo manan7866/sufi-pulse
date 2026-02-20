@@ -19,7 +19,7 @@ export interface ApprovedLyric {
 }
 
 export interface StudioRecordingRequest {
-  blog_id: number;
+  kalam_id: number;
   preferred_session_date: string; // YYYY-MM-DD
   preferred_time_block: 'Morning' | 'Afternoon' | 'Evening';
   estimated_studio_duration: '1 Hour' | '2 Hours' | 'Half Day' | 'Full Day';
@@ -95,7 +95,7 @@ export const getMyStudioRequests = () => {
 // ========================================
 
 export interface RemoteRecordingRequest {
-  blog_id: number;
+  kalam_id: number;
   recording_environment: 'Professional Studio' | 'Condenser Mic Setup' | 'USB Microphone' | 'Mobile Setup';
   target_submission_date: string; // YYYY-MM-DD
   interpretation_notes: string;

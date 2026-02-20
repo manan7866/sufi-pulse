@@ -82,9 +82,15 @@ const RemoteRecordingRequestForm: React.FC<RemoteRecordingRequestFormProps> = ({
       setLoading(true);
       const response = await getApprovedLyrics();
       setApprovedLyrics(response.data.lyrics || []);
-      
+
       if (response.data.lyrics.length === 0) {
-        toast.info('No approved lyrics available at the moment. Please check back later.');
+        toast('No approved lyrics available at the moment. Please check back later.', {
+          icon: 'ℹ️',
+          style: {
+            background: '#fef3c7',
+            color: '#92400e',
+          },
+        });
       }
     } catch (error: any) {
       console.error('Error fetching approved lyrics:', error);
@@ -194,9 +200,9 @@ const RemoteRecordingRequestForm: React.FC<RemoteRecordingRequestFormProps> = ({
 
     try {
       setSubmitting(true);
-      
+
       const requestData = {
-        blog_id: Number(formData.kalam_id),
+        kalam_id: Number(formData.kalam_id),
         recording_environment: formData.recording_environment as 'Professional Studio' | 'Condenser Mic Setup' | 'USB Microphone' | 'Mobile Setup',
         target_submission_date: formData.target_submission_date,
         interpretation_notes: formData.interpretation_notes,

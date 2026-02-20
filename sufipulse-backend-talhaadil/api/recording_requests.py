@@ -21,7 +21,7 @@ router = APIRouter(
 
 class StudioRecordingRequestCreate(BaseModel):
     """Model for creating a studio recording request"""
-    blog_id: int
+    kalam_id: int
     preferred_session_date: date
     preferred_time_block: str = Field(..., description="Morning, Afternoon, or Evening")
     estimated_studio_duration: str = Field(..., description="1 Hour, 2 Hours, Half Day, or Full Day")
@@ -33,7 +33,7 @@ class StudioRecordingRequestResponse(BaseModel):
     """Model for studio recording request response"""
     id: int
     vocalist_id: int
-    blog_id: int
+    kalam_id: int
     lyric_title: str
     lyric_writer: Optional[str]
     lyric_language: Optional[str]
@@ -49,7 +49,7 @@ class StudioRecordingRequestResponse(BaseModel):
 
 class RemoteRecordingRequestCreate(BaseModel):
     """Model for creating a remote recording request"""
-    blog_id: int
+    kalam_id: int
     recording_environment: str = Field(..., description="Professional Studio, Condenser Mic Setup, USB Microphone, or Mobile Setup")
     target_submission_date: date
     interpretation_notes: str
@@ -60,7 +60,7 @@ class RemoteRecordingRequestResponse(BaseModel):
     """Model for remote recording request response"""
     id: int
     vocalist_id: int
-    blog_id: int
+    kalam_id: int
     lyric_title: str
     lyric_writer: Optional[str]
     lyric_language: Optional[str]
@@ -114,50 +114,63 @@ def get_lyric_details(db: Queries, kalam_id: int) -> dict:
         'vocalist_approval_status': submission['vocalist_approval_status'] if submission else 'pending'
     }
 
-def get_blog_details(conn, blog_id: int) -> dict:
-    """Fetch blog details from database"""
-    # Get blog submission
-    query = """
-        SELECT 
-            bs.*,
-            u.name AS author_name,
-            b.location AS blogger_location
-        FROM blog_submissions bs
-        JOIN users u ON bs.user_id = u.id
-        LEFT JOIN bloggers b ON bs.user_id = b.user_id
-        WHERE bs.id = %s
-    """
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(query, (blog_id,))
-        blog = cur.fetchone()
-    
-    if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
-    
+def get_kalam_details(db: Queries, kalam_id: int) -> dict:
+    """Fetch kalam details from database"""
+    kalam = db.get_kalam_by_id(kalam_id)
+    if not kalam:
+        raise HTTPException(status_code=404, detail="Kalam not found")
+
+    # Get writer name
+    writer = db.get_user_by_id(kalam['writer_id'])
+    writer_name = writer['name'] if writer else "Unknown"
+
+    # Get submission status
+    submission = db.get_kalam_submission_by_kalam_id(kalam_id)
+
     return {
-        'id': blog['id'],
-        'title': blog['title'],
-        'language': blog.get('language', 'Unknown'),
-        'category': blog.get('category', 'General'),
-        'author_name': blog['author_name'],
-        'content': blog.get('content', ''),
-        'excerpt': blog.get('excerpt', ''),
-        'status': blog['status'],
-        'blogger_location': blog.get('blogger_location')
+        'id': kalam['id'],
+        'title': kalam['title'],
+        'language': kalam['language'],
+        'theme': kalam['theme'],  # This serves as category
+        'kalam_text': kalam['kalam_text'],
+        'description': kalam['description'],
+        'writer_name': writer_name,
+        'status': submission['status'] if submission else 'draft',
+        'vocalist_approval_status': submission['vocalist_approval_status'] if submission else 'pending'
     }
 
-def validate_blog_for_request(conn, blog_id: int, user_id: int) -> dict:
-    """Validate that the blog is approved"""
-    blog = get_blog_details(conn, blog_id)
+def validate_kalam_for_request(conn, kalam_id: int, user_id: int) -> dict:
+    """Validate that the kalam is approved and available"""
+    db = Queries(conn)
+    kalam = get_kalam_details(db, kalam_id)
 
-    # Check if blog is approved
-    if blog['status'] not in ['approved', 'posted']:
+    # Check if kalam is approved (final_approved or complete_approved)
+    if kalam['status'] not in ['final_approved', 'complete_approved', 'posted']:
         raise HTTPException(
             status_code=400,
-            detail="This blog is not yet approved. Only approved blogs can be used for recording requests."
+            detail="This kalam is not yet approved. Only approved kalams (final_approved or complete_approved) can be used for recording requests."
         )
 
-    return blog
+    # Check if the current user is a vocalist
+    vocalist = db.get_vocalist_by_user_id(user_id)
+    if not vocalist:
+        raise HTTPException(
+            status_code=403,
+            detail="Only vocalists can create recording requests."
+        )
+
+    # If kalam is already assigned to a vocalist, check if it's this user
+    kalam_data = db.get_kalam_by_id(kalam_id)
+    if kalam_data.get('vocalist_id') is not None:
+        vocalist_check = db.get_vocalist_by_user_id(user_id)
+        if kalam_data['vocalist_id'] != vocalist_check['id']:
+            # Kalam is assigned to another vocalist
+            raise HTTPException(
+                status_code=403,
+                detail="This kalam is already assigned to another vocalist."
+            )
+
+    return kalam
 
 async def upload_reference_file(file: UploadFile, kalam_id: int, request_type: str) -> Optional[str]:
     """Upload reference file and return URL"""
@@ -205,10 +218,11 @@ async def upload_reference_file(file: UploadFile, kalam_id: int, request_type: s
 @router.get("/approved-lyrics")
 def get_approved_lyrics(user_id: int = Depends(get_current_user)):
     """
-    Get all approved blogs from bloggers for recording requests
-    Only shows blogs that are:
-    - Admin approved (approved or posted status)
-    - Includes author info, location, date
+    Get all approved kalams from writers for recording requests
+    Only shows kalams that are:
+    - complete_approved (vocalist has approved and ready for recording)
+    - Assigned to the current vocalist
+    - Includes writer info
     """
     conn = DBConnection.get_connection()
     db = Queries(conn)
@@ -226,33 +240,36 @@ def get_approved_lyrics(user_id: int = Depends(get_current_user)):
     if not vocalist:
         raise HTTPException(status_code=400, detail="Vocalist profile not found. Please complete your profile first.")
 
-    # Fetch approved blogs from blogger_submissions
+    # Fetch approved kalams from kalam_submissions
     try:
-        blogs = db.fetch_approved_blogs(skip=0, limit=100)  # Get all approved blogs
+        print(f"🔍 Fetching approved kalams for vocalist {user_id}...")
+        kalams = db.fetch_approved_kalams_for_vocalist(skip=0, limit=100)
+        print(f"✅ Found {len(kalams)} kalams (final_approved or complete_approved)")
         
         approved_lyrics = []
-        for blog in blogs:
-            # Get blogger location info
-            blogger = db.get_blogger_by_user_id(blog['user_id'])
-            
+        for kalam in kalams:
+            # Get writer info - use writer_name from kalam data directly
             approved_lyrics.append({
-                'id': blog['id'],
-                'title': blog['title'],
-                'language': blog.get('language', 'Unknown'),
-                'category': blog.get('category', 'General'),
-                'writer_name': blog.get('author_name', blog.get('blogger_name', 'Unknown')),
-                'kalam_text': blog.get('content', blog.get('excerpt', '')),
-                'description': blog.get('excerpt', blog.get('content', '')[:200] + '...'),
-                'posted_by': blog.get('author_name', 'Admin'),
-                'location': blogger.get('location') if blogger else 'Not specified',
-                'posted_date': blog.get('created_at', '').isoformat() if blog.get('created_at') else None,
-                'youtube_link': None  # Blogs don't have YouTube links
+                'id': kalam['id'],
+                'title': kalam['title'],
+                'language': kalam.get('language', 'Unknown'),
+                'category': kalam.get('category', 'General'),
+                'writer_name': kalam.get('writer_name', 'Unknown'),
+                'kalam_text': kalam.get('kalam_text', ''),
+                'description': kalam.get('description', ''),
+                'posted_by': kalam.get('writer_name', 'Writer'),
+                'location': 'Not specified',
+                'posted_date': kalam.get('created_at', '').isoformat() if kalam.get('created_at') else None,
+                'youtube_link': None,  # Kalams don't have YouTube links yet
+                'status': kalam.get('status', 'final_approved'),
+                'vocalist_approval_status': kalam.get('vocalist_approval_status', 'pending')
             })
-        
+
         return {"lyrics": approved_lyrics}
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching blogs: {str(e)}")
+        print(f"❌ Error fetching kalams: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching kalams: {str(e)}")
 
 @router.get("/lyrics/{kalam_id}")
 def get_lyric_preview(kalam_id: int, user_id: int = Depends(get_current_user)):
@@ -274,55 +291,55 @@ def create_studio_recording_request(
 ):
     """
     Create a new studio recording request (In-Person)
-    
+
     This endpoint:
-    1. Validates the lyric is approved and unassigned
-    2. Checks if a request already exists for this lyric
+    1. Validates the kalam is approved and unassigned
+    2. Checks if a request already exists for this kalam
     3. Creates the studio recording request
     4. Returns the created request
     """
     conn = DBConnection.get_connection()
     db = Queries(conn)
-    
+
     # Get user and vocalist info
     user = db.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if user['role'] != 'vocalist':
         raise HTTPException(status_code=403, detail="Only vocalists can create recording requests")
-    
+
     vocalist = db.get_vocalist_by_user_id(user_id)
     if not vocalist:
         raise HTTPException(status_code=400, detail="Vocalist profile not found")
 
-    # Validate blog
-    blog = validate_blog_for_request(conn, request.blog_id, user_id)
+    # Validate kalam
+    kalam = validate_kalam_for_request(conn, request.kalam_id, user_id)
 
     # Check if request already exists
     existing_query = """
         SELECT * FROM studio_recording_requests
-        WHERE vocalist_id = %s AND blog_id = %s
+        WHERE vocalist_id = %s AND kalam_id = %s
     """
     with conn.cursor() as cur:
-        cur.execute(existing_query, (vocalist['id'], request.blog_id))
+        cur.execute(existing_query, (vocalist['id'], request.kalam_id))
         if cur.fetchone():
             raise HTTPException(
                 status_code=400,
-                detail="You have already submitted a studio recording request for this blog."
+                detail="You have already submitted a studio recording request for this kalam."
             )
-    
+
     # Validate date (cannot be in the past)
     if request.preferred_session_date < date.today():
         raise HTTPException(
             status_code=400,
             detail="Preferred session date cannot be in the past."
         )
-    
+
     # Create the request
     insert_query = """
         INSERT INTO studio_recording_requests (
-            vocalist_id, blog_id,
+            vocalist_id, kalam_id,
             lyric_title, lyric_writer, lyric_language, lyric_category,
             preferred_session_date, preferred_time_block,
             estimated_studio_duration, performance_direction,
@@ -336,11 +353,11 @@ def create_studio_recording_request(
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(insert_query, (
             vocalist['id'],
-            request.blog_id,
-            blog['title'],
-            blog['author_name'],
-            blog['language'],
-            blog['category'],
+            request.kalam_id,
+            kalam['title'],
+            kalam['writer_name'],
+            kalam['language'],
+            kalam['theme'],
             request.preferred_session_date,
             request.preferred_time_block,
             request.estimated_studio_duration,
@@ -351,14 +368,14 @@ def create_studio_recording_request(
             datetime.now(),
             datetime.now()
         ))
-        
+
         result = cur.fetchone()
         conn.commit()
-    
+
     return StudioRecordingRequestResponse(
         id=result['id'],
         vocalist_id=result['vocalist_id'],
-        blog_id=result['blog_id'],
+        kalam_id=result['kalam_id'],
         lyric_title=result['lyric_title'],
         lyric_writer=result['lyric_writer'],
         lyric_language=result['lyric_language'],
@@ -380,55 +397,55 @@ def create_remote_recording_request(
 ):
     """
     Create a new remote recording request
-    
+
     This endpoint:
-    1. Validates the lyric is approved and unassigned
-    2. Checks if a request already exists for this lyric
+    1. Validates the kalam is approved and unassigned
+    2. Checks if a request already exists for this kalam
     3. Creates the remote recording request
     4. Returns the created request
     """
     conn = DBConnection.get_connection()
     db = Queries(conn)
-    
+
     # Get user and vocalist info
     user = db.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     if user['role'] != 'vocalist':
         raise HTTPException(status_code=403, detail="Only vocalists can create recording requests")
-    
+
     vocalist = db.get_vocalist_by_user_id(user_id)
     if not vocalist:
         raise HTTPException(status_code=400, detail="Vocalist profile not found")
 
-    # Validate blog
-    blog = validate_blog_for_request(conn, request.blog_id, user_id)
+    # Validate kalam
+    kalam = validate_kalam_for_request(conn, request.kalam_id, user_id)
 
     # Check if request already exists
     existing_query = """
         SELECT * FROM remote_recording_requests_new
-        WHERE vocalist_id = %s AND blog_id = %s
+        WHERE vocalist_id = %s AND kalam_id = %s
     """
     with conn.cursor() as cur:
-        cur.execute(existing_query, (vocalist['id'], request.blog_id))
+        cur.execute(existing_query, (vocalist['id'], request.kalam_id))
         if cur.fetchone():
             raise HTTPException(
                 status_code=400,
-                detail="You have already submitted a remote recording request for this blog."
+                detail="You have already submitted a remote recording request for this kalam."
             )
-    
+
     # Validate date (cannot be in the past)
     if request.target_submission_date < date.today():
         raise HTTPException(
             status_code=400,
             detail="Target submission date cannot be in the past."
         )
-    
+
     # Create the request
     insert_query = """
         INSERT INTO remote_recording_requests_new (
-            vocalist_id, blog_id,
+            vocalist_id, kalam_id,
             lyric_title, lyric_writer, lyric_language, lyric_category,
             recording_environment, target_submission_date,
             interpretation_notes,
@@ -442,11 +459,11 @@ def create_remote_recording_request(
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(insert_query, (
             vocalist['id'],
-            request.blog_id,
-            blog['title'],
-            blog['author_name'],
-            blog['language'],
-            blog['category'],
+            request.kalam_id,
+            kalam['title'],
+            kalam['writer_name'],
+            kalam['language'],
+            kalam['theme'],
             request.recording_environment,
             request.target_submission_date,
             request.interpretation_notes,
@@ -456,14 +473,14 @@ def create_remote_recording_request(
             datetime.now(),
             datetime.now()
         ))
-        
+
         result = cur.fetchone()
         conn.commit()
-    
+
     return RemoteRecordingRequestResponse(
         id=result['id'],
         vocalist_id=result['vocalist_id'],
-        blog_id=result['blog_id'],
+        kalam_id=result['kalam_id'],
         lyric_title=result['lyric_title'],
         lyric_writer=result['lyric_writer'],
         lyric_language=result['lyric_language'],
@@ -548,13 +565,13 @@ def check_request_exists(kalam_id: int, user_id: int = Depends(get_current_user)
     # Check studio request
     studio_query = """
         SELECT * FROM studio_recording_requests
-        WHERE vocalist_id = %s AND blog_id = %s
+        WHERE vocalist_id = %s AND kalam_id = %s
     """
 
     # Check remote request
     remote_query = """
         SELECT * FROM remote_recording_requests_new
-        WHERE vocalist_id = %s AND blog_id = %s
+        WHERE vocalist_id = %s AND kalam_id = %s
     """
 
     with conn.cursor() as cur:
