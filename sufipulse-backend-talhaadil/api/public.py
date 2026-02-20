@@ -307,6 +307,10 @@ def record_blog_view(
     db = Queries(conn)
 
     try:
+        print(f"\n=== VIEW REQUEST ===")
+        print(f"Blog ID: {blog_id}")
+        print(f"User ID: {user_id}")
+        
         # Check if blog exists
         blog = db.fetch_blog_by_id(blog_id)
         if not blog:
@@ -315,6 +319,9 @@ def record_blog_view(
         # Get client IP for unique view tracking
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("user-agent", "")
+        
+        print(f"IP Address: {ip_address}")
+        print(f"Current view count: {blog.get('view_count', 0)}")
 
         # Record the view (returns True if unique view was counted)
         is_unique = db.record_blog_view(
@@ -323,9 +330,13 @@ def record_blog_view(
             ip_address=ip_address,
             user_agent=user_agent
         )
+        
+        print(f"Is unique view: {is_unique}")
 
         # Get updated blog data with new view count
         updated_blog = db.fetch_blog_by_id(blog_id)
+        print(f"New view count: {updated_blog.get('view_count', 0)}")
+        print(f"====================\n")
 
         return {
             "message": "View recorded",
@@ -515,8 +526,12 @@ def add_blog_comment(
 
 
 @router.get("/blogs/{blog_id}/comments")
-def get_blog_comments(blog_id: int):
-    """Get all approved comments for a blog post"""
+def get_blog_comments(
+    blog_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(5, ge=1, le=50)
+):
+    """Get all approved comments for a blog post with pagination"""
     conn = DBConnection.get_connection()
     db = Queries(conn)
 
@@ -526,11 +541,21 @@ def get_blog_comments(blog_id: int):
         if not blog:
             raise HTTPException(status_code=404, detail="Blog post not found")
 
-        comments = db.get_blog_comments(blog_id, only_approved=True)
+        comments = db.get_blog_comments_paginated(blog_id, skip, limit, only_approved=True)
+        
+        # Get total count
+        total_query = "SELECT COUNT(*) as count FROM blog_comments WHERE blog_id = %s AND is_approved = TRUE AND parent_id IS NULL"
+        with conn.cursor() as cur:
+            cur.execute(total_query, (blog_id,))
+            total_result = cur.fetchone()
+            total_comments = total_result['count'] if total_result else 0
 
         return {
             "blog_id": blog_id,
-            "total_comments": len(comments),
+            "total_comments": total_comments,
+            "skip": skip,
+            "limit": limit,
+            "has_more": skip + limit < total_comments,
             "comments": comments
         }
     except HTTPException:

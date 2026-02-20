@@ -407,6 +407,30 @@ class BloggerQueries:
             
             return comments
 
+    def get_blog_comments_paginated(self, blog_id: int, skip: int, limit: int, only_approved: bool = True) -> list:
+        """Get paginated comments for a blog post"""
+        query = """
+            SELECT 
+                bc.*,
+                u.name as user_name,
+                u.email as user_email
+            FROM blog_comments bc
+            LEFT JOIN users u ON bc.user_id = u.id
+            WHERE bc.blog_id = %s AND bc.parent_id IS NULL
+            """ + ("AND bc.is_approved = TRUE " if only_approved else "") + """
+            ORDER BY bc.created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, (blog_id, limit, skip))
+            comments = cur.fetchall()
+            
+            # Get replies for each comment
+            for comment in comments:
+                comment['replies'] = self._get_comment_replies(comment['id'], only_approved)
+            
+            return comments
+
     def _get_comment_replies(self, parent_id: int, only_approved: bool = True) -> list:
         """Get replies to a specific comment"""
         query = """

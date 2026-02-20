@@ -240,8 +240,12 @@ export const addBlogComment = (blogId: number, data: {
 /**
  * Get all approved comments for a blog post
  */
-export const getBlogComments = (blogId: number) => {
+export const getBlogComments = (blogId: number, skip?: number, limit?: number) => {
   return api.get(`/public/blogs/${blogId}/comments`, {
+    params: {
+      skip: skip ?? 0,
+      limit: limit ?? 5,
+    },
     headers: {
       requiresAuth: false,
     },

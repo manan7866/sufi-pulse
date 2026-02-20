@@ -261,7 +261,7 @@ const Navbar = () => {
                   <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
                     <UserCircle className="h-5 w-5 text-emerald-600" />
                   </div>
-                  <div className="text-left">
+                  <div className="text-left z-50">
                     <div className="font-medium text-sm">{userName}</div>
                     <div className="text-xs text-slate-500 capitalize">
                       {userRole}
@@ -270,7 +270,7 @@ const Navbar = () => {
                   <ChevronDown className="h-4 w-4" />
                 </button>
                 {activeDropdown === "user" && (
-                  <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
+                  <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-5000000">
                     <Link
                       href={getDashboardPath(userRole)}
                       className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"

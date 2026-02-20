@@ -74,6 +74,11 @@ export default function BlogPostDetailPage({ params }: PageProps) {
   const [likes, setLikes] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentSkip, setCommentSkip] = useState(0);
+  const [commentLimit] = useState(5);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
+  const [isLoadingMoreComments, setIsLoadingMoreComments] = useState(false);
+  const [totalComments, setTotalComments] = useState(0);
   const [commentText, setCommentText] = useState('');
   const [commenterName, setCommenterName] = useState('');
   const [commenterEmail, setCommenterEmail] = useState('');
@@ -181,12 +186,33 @@ export default function BlogPostDetailPage({ params }: PageProps) {
     }
   };
 
-  const fetchComments = async (blogId: number) => {
+  const fetchComments = async (blogId: number, append = false) => {
     try {
-      const commentsResponse = await getBlogComments(blogId);
-      setComments(commentsResponse.data.comments || []);
+      if (!append) {
+        setIsLoadingMoreComments(true);
+      }
+      const skip = append ? commentSkip : 0;
+      const commentsResponse = await getBlogComments(blogId, skip, commentLimit);
+      
+      if (append) {
+        setComments(prev => [...prev, ...(commentsResponse.data.comments || [])]);
+      } else {
+        setComments(commentsResponse.data.comments || []);
+      }
+      
+      setTotalComments(commentsResponse.data.total_comments || 0);
+      setHasMoreComments(commentsResponse.data.has_more ?? false);
+      setCommentSkip(skip + commentLimit);
     } catch (error) {
       console.error('Failed to fetch comments:', error);
+    } finally {
+      setIsLoadingMoreComments(false);
+    }
+  };
+
+  const loadMoreComments = () => {
+    if (!isLoadingMoreComments && hasMoreComments) {
+      fetchComments(parseInt(resolvedParams.id), true);
     }
   };
 
@@ -456,7 +482,7 @@ export default function BlogPostDetailPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-slate-50">
       {/* Navigation Header */}
-      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/50 shadow-sm">
+      <div className="sticky top-0  bg-white/90 backdrop-blur-xl border-b border-slate-200/50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-18">
             <Link
@@ -747,7 +773,7 @@ export default function BlogPostDetailPage({ params }: PageProps) {
                     </div>
                     <div>
                       <p className="font-semibold text-slate-800">{commenterName || 'Registered User'}</p>
-                      <p className="text-sm text-slate-600">{commenterEmail || 'Email hidden'}</p>
+                      {/* <p className="text-sm text-slate-600">{commenterEmail || 'Email hidden'}</p> */}
                     </div>
                   </div>
                   <p className="text-xs text-emerald-700">
@@ -822,7 +848,34 @@ export default function BlogPostDetailPage({ params }: PageProps) {
           {/* Comments List */}
           <div className="space-y-6">
             {comments.length > 0 ? (
-              comments.map((comment) => renderComment(comment))
+              <>
+                {comments.map((comment) => renderComment(comment))}
+                
+                {/* Load More Button */}
+                {hasMoreComments && (
+                  <div className="text-center pt-6">
+                    <button
+                      onClick={loadMoreComments}
+                      disabled={isLoadingMoreComments}
+                      className="inline-flex items-center space-x-2 bg-gradient-to-r from-slate-100 to-slate-50 hover:from-emerald-50 hover:to-emerald-50 text-slate-700 hover:text-emerald-700 px-8 py-3 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200 hover:border-emerald-200"
+                    >
+                      {isLoadingMoreComments ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span>Loading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Load More Comments</span>
+                          <span className="text-sm text-slate-500">
+                            ({comments.length} of {totalComments})
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
                 <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
